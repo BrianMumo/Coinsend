@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum OrderType {
+  CRYPTO_TO_KES
+  KES_TO_CRYPTO
+  CROSS_BORDER
+  OTC
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum KycStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  VIEWER
+}
+
+enum CryptoCurrency {
+  USDT
+  USDC
+  BTC
+  ETH
+}
+
+enum CryptoNetwork {
+  TRON
+  ETHEREUM
+  BSC
+  POLYGON
+  BITCOIN
+}
+
+// ============ MODELS ============
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  phone         String?    @unique
+  passwordHash  String
+  firstName     String?
+  lastName      String?
+  country       String     @default("KE")
+  kycStatus     KycStatus  @default(UNVERIFIED)
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  lastLoginAt   DateTime?
+
+  orders        Order[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([kycStatus])
+}
+
+model Admin {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          AdminRole  @default(ADMIN)
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  lastLoginAt   DateTime?
+
+  processedOrders Order[]  @relation("ProcessedByAdmin")
+
+  @@index([email])
+  @@index([role])
+}
+
+model Order {
+  id                  String        @id @default(uuid())
+  orderNumber         String        @unique
+  userId              String
+  orderType           OrderType
+  status              OrderStatus   @default(PENDING)
+
+  // Currencies
+  sourceCurrency      String
+  destinationCurrency String
+
+  // Amounts
+  sourceAmount        Decimal       @db.Decimal(18, 8)
+  destinationAmount   Decimal       @db.Decimal(18, 8)
+  exchangeRate        Decimal       @db.Decimal(18, 8)
+  fee                 Decimal       @default(0) @db.Decimal(18, 8)
+
+  // Payment details (user -> Coinsend)
+  paymentMethod       String?
+  paymentReference    String?
+  paymentProofUrl     String?
+
+  // Payout details (Coinsend -> user)
+  payoutMethod        String?
+  payoutReference     String?
+  payoutDestination   String?
+
+  // Cross-border specific
+  recipientName       String?
+  recipientPhone      String?
+  recipientBank       String?
+  recipientAccount    String?
+
+  // Processing
+  processedById       String?
+  processingNotes     String?
+
+  // Timestamps
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  paidAt              DateTime?
+  completedAt         DateTime?
+  expiresAt           DateTime?
+
+  // Relations
+  user                User          @relation(fields: [userId], references: [id])
+  processedBy         Admin?        @relation("ProcessedByAdmin", fields: [processedById], references: [id])
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([orderType])
+  @@index([createdAt])
+}
+
+model Wallet {
+  id            String          @id @default(uuid())
+  currency      CryptoCurrency
+  network       CryptoNetwork
+  address       String          @unique
+  label         String?
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([currency])
+  @@index([network])
+  @@index([isActive])
+}
+
+model LiquidityBalance {
+  id            String     @id @default(uuid())
+  currency      String     @unique
+  balance       Decimal    @db.Decimal(18, 8)
+  lastUpdated   DateTime   @default(now())
+  updatedBy     String?
+  notes         String?
+
+  @@index([currency])
+}
+
+model ExchangeRate {
+  id            String     @id @default(uuid())
+  pair          String     @unique
+  buyRate       Decimal    @db.Decimal(18, 8)
+  sellRate      Decimal    @db.Decimal(18, 8)
+  midRate       Decimal    @db.Decimal(18, 8)
+  spread        Decimal    @db.Decimal(5, 4)
+  minAmount     Decimal    @default(10) @db.Decimal(18, 8)
+  maxAmount     Decimal    @default(100000) @db.Decimal(18, 8)
+  isActive      Boolean    @default(true)
+  lastUpdated   DateTime   @default(now())
+  updatedBy     String?
+
+  @@index([pair])
+  @@index([isActive])
+}
+
+model AuditLog {
+  id            String     @id @default(uuid())
+  userId        String?
+  adminId       String?
+  action        String
+  entityType    String?
+  entityId      String?
+  details       Json?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime   @default(now())
+
+  @@index([userId])
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+}

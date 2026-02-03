@@ -1,0 +1,161 @@
+import { adminApi } from './client';
+import {
+  ApiResponse,
+  Admin,
+  Order,
+  User,
+  ExchangeRate,
+  LiquidityBalance,
+  Wallet,
+  DashboardStats,
+  Pagination,
+  OrderStatus
+} from '../types';
+
+export interface AdminLoginData {
+  email: string;
+  password: string;
+}
+
+export interface AdminAuthResponse {
+  admin: Admin;
+  token: string;
+}
+
+export interface OrderListParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  status?: string;
+  orderType?: string;
+  search?: string;
+}
+
+export interface UserListParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  kycStatus?: string;
+  search?: string;
+}
+
+export const adminAuthApi = {
+  login: async (data: AdminLoginData): Promise<ApiResponse<AdminAuthResponse>> => {
+    const response = await adminApi.post('/admin/login', data);
+    return response.data;
+  },
+
+  getCurrentAdmin: async (): Promise<ApiResponse<{ admin: Admin }>> => {
+    const response = await adminApi.get('/admin/me');
+    return response.data;
+  },
+};
+
+export const adminDashboardApi = {
+  getStats: async (): Promise<ApiResponse<DashboardStats>> => {
+    const response = await adminApi.get('/admin/dashboard');
+    return response.data;
+  },
+};
+
+export const adminOrdersApi = {
+  getAll: async (params?: OrderListParams): Promise<ApiResponse<Order[]> & { pagination: Pagination }> => {
+    const response = await adminApi.get('/admin/orders', { params });
+    return response.data;
+  },
+
+  updateStatus: async (
+    id: string,
+    status: OrderStatus,
+    processingNotes?: string,
+    payoutReference?: string
+  ): Promise<ApiResponse<{ order: Order }>> => {
+    const response = await adminApi.put(`/admin/orders/${id}/status`, {
+      status,
+      processingNotes,
+      payoutReference
+    });
+    return response.data;
+  },
+};
+
+export const adminUsersApi = {
+  getAll: async (params?: UserListParams): Promise<ApiResponse<User[]> & { pagination: Pagination }> => {
+    const response = await adminApi.get('/admin/users', { params });
+    return response.data;
+  },
+
+  getById: async (id: string): Promise<ApiResponse<{ user: User & { orders: Order[] } }>> => {
+    const response = await adminApi.get(`/admin/users/${id}`);
+    return response.data;
+  },
+};
+
+export const adminRatesApi = {
+  getAll: async (): Promise<ApiResponse<{ rates: ExchangeRate[] }>> => {
+    const response = await adminApi.get('/admin/rates');
+    return response.data;
+  },
+
+  update: async (
+    id: string,
+    data: { buyRate?: number; sellRate?: number; isActive?: boolean }
+  ): Promise<ApiResponse<{ rate: ExchangeRate }>> => {
+    const response = await adminApi.put(`/admin/rates/${id}`, data);
+    return response.data;
+  },
+
+  create: async (data: {
+    pair: string;
+    buyRate: number;
+    sellRate: number;
+    minAmount?: number;
+    maxAmount?: number;
+  }): Promise<ApiResponse<{ rate: ExchangeRate }>> => {
+    const response = await adminApi.post('/admin/rates', data);
+    return response.data;
+  },
+};
+
+export const adminLiquidityApi = {
+  getAll: async (): Promise<ApiResponse<{ balances: LiquidityBalance[] }>> => {
+    const response = await adminApi.get('/admin/liquidity');
+    return response.data;
+  },
+
+  update: async (
+    currency: string,
+    balance: number,
+    notes?: string
+  ): Promise<ApiResponse<{ balance: LiquidityBalance }>> => {
+    const response = await adminApi.put(`/admin/liquidity/${currency}`, { balance, notes });
+    return response.data;
+  },
+};
+
+export const adminWalletsApi = {
+  getAll: async (): Promise<ApiResponse<{ wallets: Wallet[] }>> => {
+    const response = await adminApi.get('/admin/wallets');
+    return response.data;
+  },
+
+  create: async (data: {
+    currency: string;
+    network: string;
+    address: string;
+    label?: string
+  }): Promise<ApiResponse<{ wallet: Wallet }>> => {
+    const response = await adminApi.post('/admin/wallets', data);
+    return response.data;
+  },
+
+  update: async (
+    id: string,
+    data: { isActive?: boolean; label?: string }
+  ): Promise<ApiResponse<{ wallet: Wallet }>> => {
+    const response = await adminApi.put(`/admin/wallets/${id}`, data);
+    return response.data;
+  },
+};
