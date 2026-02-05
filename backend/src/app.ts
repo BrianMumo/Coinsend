@@ -16,12 +16,23 @@ import adminRoutes from './routes/admin.routes';
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
 // CORS
+const allowedOrigins = config.frontendUrl.split(',').map(url => url.trim());
 app.use(
   cors({
-    origin: config.frontendUrl.split(',').map(url => url.trim()),
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      logger.warn(`CORS blocked origin: ${origin}, allowed: ${allowedOrigins.join(', ')}`);
+      return callback(null, false);
+    },
     credentials: true,
   })
 );
