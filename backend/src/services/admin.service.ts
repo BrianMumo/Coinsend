@@ -1,5 +1,5 @@
 import { PrismaClient, OrderStatus, AdminRole } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
