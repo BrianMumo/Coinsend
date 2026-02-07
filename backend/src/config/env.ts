@@ -7,6 +7,11 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
 
+  mpesa: {
+    paybillNumber: process.env.MPESA_PAYBILL || '123456',
+    businessName: process.env.MPESA_BUSINESS_NAME || 'Coinsend',
+  },
+
   jwt: {
     secret: process.env.JWT_SECRET || 'default-secret-change-me',
     adminSecret: process.env.JWT_ADMIN_SECRET || 'default-admin-secret-change-me',

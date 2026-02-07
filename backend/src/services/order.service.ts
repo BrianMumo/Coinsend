@@ -2,6 +2,7 @@ import { PrismaClient, OrderType, OrderStatus } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 import { CreateOrderRequest, PaginationParams } from '../types';
 import { rateService } from './rate.service';
+import { config } from '../config/env';
 
 const prisma = new PrismaClient();
 
@@ -54,7 +55,7 @@ export class OrderService {
     });
 
     // Get payment instructions based on order type
-    const paymentInstructions = this.getPaymentInstructions(order);
+    const paymentInstructions = await this.getPaymentInstructions(order);
 
     return { order, paymentInstructions };
   }
@@ -90,7 +91,7 @@ export class OrderService {
       throw new AppError('Access denied', 403);
     }
 
-    const paymentInstructions = this.getPaymentInstructions(order);
+    const paymentInstructions = await this.getPaymentInstructions(order);
 
     return { order, paymentInstructions };
   }
@@ -211,7 +212,7 @@ export class OrderService {
     return `CS-${dateStr}-${sequence}`;
   }
 
-  private getPaymentInstructions(order: any) {
+  private async getPaymentInstructions(order: any) {
     const instructions: any = {};
 
     switch (order.orderType) {
@@ -222,8 +223,7 @@ export class OrderService {
         instructions.details = {
           currency: order.sourceCurrency,
           amount: order.sourceAmount.toString(),
-          // In production, fetch actual wallet from database
-          walletAddress: this.getMockWalletAddress(order.sourceCurrency),
+          walletAddress: await this.getWalletAddress(order.sourceCurrency),
           network: this.getNetwork(order.sourceCurrency),
         };
         instructions.note = 'After sending, submit your transaction hash as proof of payment';
@@ -235,9 +235,9 @@ export class OrderService {
         instructions.message = 'Send KES via M-Pesa';
         instructions.details = {
           amount: order.sourceAmount.toString(),
-          paybillNumber: '123456',
+          paybillNumber: config.mpesa.paybillNumber,
           accountNumber: order.orderNumber,
-          businessName: 'Coinsend Ltd',
+          businessName: config.mpesa.businessName,
         };
         instructions.note = 'Use your order number as the account number';
         break;
@@ -248,9 +248,9 @@ export class OrderService {
         instructions.message = `Send KES for cross-border transfer to ${order.destinationCurrency}`;
         instructions.details = {
           amount: order.sourceAmount.toString(),
-          paybillNumber: '123456',
+          paybillNumber: config.mpesa.paybillNumber,
           accountNumber: order.orderNumber,
-          businessName: 'Coinsend Ltd',
+          businessName: config.mpesa.businessName,
         };
         instructions.note = 'Funds will be delivered to recipient within 24-48 hours';
         break;
@@ -269,15 +269,27 @@ export class OrderService {
     return instructions;
   }
 
-  private getMockWalletAddress(currency: string): string {
-    // Mock wallet addresses for MVP
-    const wallets: Record<string, string> = {
+  private async getWalletAddress(currency: string): Promise<string> {
+    // Fetch active wallet from database
+    const wallet = await prisma.wallet.findFirst({
+      where: {
+        currency: currency as any,
+        isActive: true,
+      },
+    });
+
+    if (wallet) {
+      return wallet.address;
+    }
+
+    // Fallback for development/testing
+    const fallbackWallets: Record<string, string> = {
       USDT: 'TXYZabc123def456ghi789jkl012mno345',
       USDC: '0x1234567890abcdef1234567890abcdef12345678',
       BTC: '1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2',
       ETH: '0xabcdef1234567890abcdef1234567890abcdef12',
     };
-    return wallets[currency] || wallets.USDT;
+    return fallbackWallets[currency] || fallbackWallets.USDT;
   }
 
   private getNetwork(currency: string): string {
