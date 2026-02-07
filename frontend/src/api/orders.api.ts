@@ -47,4 +47,25 @@ export const ordersApi = {
     const response = await api.post(`/orders/${id}/cancel`);
     return response.data;
   },
+
+  // M-Pesa STK Push
+  initiateSTKPush: async (orderId: string, phoneNumber: string): Promise<ApiResponse<{
+    message: string;
+    checkoutRequestId: string;
+    merchantRequestId: string;
+  }>> => {
+    const response = await api.post('/mpesa/stkpush', { orderId, phoneNumber });
+    return response.data;
+  },
+
+  checkPaymentStatus: async (orderId: string): Promise<ApiResponse<{
+    orderId: string;
+    orderNumber: string;
+    status: string;
+    isPaid: boolean;
+    paidAt: string | null;
+  }>> => {
+    const response = await api.get(`/mpesa/order-status/${orderId}`);
+    return response.data;
+  },
 };

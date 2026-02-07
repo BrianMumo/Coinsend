@@ -10,6 +10,12 @@ export const config = {
   mpesa: {
     paybillNumber: process.env.MPESA_PAYBILL || '123456',
     businessName: process.env.MPESA_BUSINESS_NAME || 'Coinsend',
+    consumerKey: process.env.MPESA_CONSUMER_KEY || '',
+    consumerSecret: process.env.MPESA_CONSUMER_SECRET || '',
+    passkey: process.env.MPESA_PASSKEY || '',
+    shortcode: process.env.MPESA_SHORTCODE || process.env.MPESA_PAYBILL || '123456',
+    callbackUrl: process.env.MPESA_CALLBACK_URL || '',
+    environment: process.env.MPESA_ENV || 'sandbox', // 'sandbox' or 'production'
   },
 
   jwt: {

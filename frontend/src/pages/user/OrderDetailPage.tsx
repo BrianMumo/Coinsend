@@ -18,6 +18,7 @@ import {
   Clock,
   AlertCircle,
   Upload,
+  Smartphone,
 } from 'lucide-react';
 
 const OrderDetailPage = () => {
@@ -30,6 +31,10 @@ const OrderDetailPage = () => {
   const [paymentReference, setPaymentReference] = useState('');
   const [isSubmittingProof, setIsSubmittingProof] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [stkPhone, setStkPhone] = useState('');
+  const [isInitiatingSTK, setIsInitiatingSTK] = useState(false);
+  const [stkMessage, setStkMessage] = useState<string | null>(null);
+  const [isPollingPayment, setIsPollingPayment] = useState(false);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -85,6 +90,65 @@ const OrderDetailPage = () => {
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Failed to cancel order');
     }
+  };
+
+  const handleSTKPush = async () => {
+    if (!id || !stkPhone) return;
+
+    setIsInitiatingSTK(true);
+    setStkMessage(null);
+    setError(null);
+
+    try {
+      const response = await ordersApi.initiateSTKPush(id, stkPhone);
+      if (response.success) {
+        setStkMessage(response.data?.message || 'Check your phone for the M-Pesa prompt');
+        // Start polling for payment status
+        setIsPollingPayment(true);
+        pollPaymentStatus();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Failed to initiate M-Pesa payment');
+    } finally {
+      setIsInitiatingSTK(false);
+    }
+  };
+
+  const pollPaymentStatus = async () => {
+    if (!id) return;
+
+    const maxAttempts = 60; // Poll for 2 minutes (every 2 seconds)
+    let attempts = 0;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setIsPollingPayment(false);
+        setStkMessage('Payment timeout. Please try again or use manual payment.');
+        return;
+      }
+
+      try {
+        const response = await ordersApi.checkPaymentStatus(id);
+        if (response.success && response.data?.isPaid) {
+          // Refresh order data
+          const orderResponse = await ordersApi.getById(id);
+          if (orderResponse.success && orderResponse.data) {
+            setOrder(orderResponse.data.order);
+            setPaymentInstructions(orderResponse.data.paymentInstructions);
+          }
+          setIsPollingPayment(false);
+          setStkMessage('Payment received successfully!');
+          return;
+        }
+      } catch (err) {
+        // Continue polling even on error
+      }
+
+      attempts++;
+      setTimeout(poll, 2000);
+    };
+
+    poll();
   };
 
   if (isLoading) {
@@ -240,20 +304,56 @@ const OrderDetailPage = () => {
             )}
 
             {paymentInstructions.type === 'mpesa_payment' && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-500">Paybill Number</p>
-                    <p className="font-bold text-lg">{paymentInstructions.details.paybillNumber}</p>
+              <div className="space-y-4">
+                {/* STK Push Option */}
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h4 className="font-semibold text-green-800 mb-2 flex items-center">
+                    <Smartphone className="h-5 w-5 mr-2" />
+                    Pay with M-Pesa (Recommended)
+                  </h4>
+                  <p className="text-sm text-green-700 mb-3">
+                    Enter your phone number and receive a payment prompt directly on your phone.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="0712345678"
+                      value={stkPhone}
+                      onChange={(e) => setStkPhone(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={handleSTKPush}
+                      isLoading={isInitiatingSTK || isPollingPayment}
+                      disabled={!stkPhone || isPollingPayment}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isPollingPayment ? 'Waiting...' : 'Pay Now'}
+                    </Button>
                   </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-500">Account Number</p>
-                    <p className="font-bold text-lg">{paymentInstructions.details.accountNumber}</p>
-                  </div>
+                  {stkMessage && (
+                    <Alert variant={stkMessage.includes('success') ? 'success' : 'info'} className="mt-3">
+                      {stkMessage}
+                    </Alert>
+                  )}
                 </div>
-                <p className="text-sm text-gray-600">
-                  Amount: KES {parseFloat(paymentInstructions.details.amount).toLocaleString()}
-                </p>
+
+                {/* Manual Payment Option */}
+                <div className="border-t pt-4">
+                  <p className="text-sm text-gray-500 mb-3">Or pay manually via M-Pesa:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-500">Paybill Number</p>
+                      <p className="font-bold text-lg">{paymentInstructions.details.paybillNumber}</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-500">Account Number</p>
+                      <p className="font-bold text-lg">{paymentInstructions.details.accountNumber}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Amount: KES {parseFloat(paymentInstructions.details.amount).toLocaleString()}
+                  </p>
+                </div>
               </div>
             )}
 
