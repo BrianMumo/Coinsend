@@ -136,3 +136,46 @@ export interface DashboardStats {
     today: string | number;
   };
 }
+
+// M-Pesa types
+export type MpesaTransactionType = 'C2B_STK_PUSH' | 'B2C_PAYMENT' | 'BALANCE_QUERY';
+export type MpesaTransactionStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'TIMEOUT';
+
+export interface MpesaTransaction {
+  id: string;
+  transactionType: MpesaTransactionType;
+  status: MpesaTransactionStatus;
+  originatorConversationId: string | null;
+  conversationId: string | null;
+  commandId: string | null;
+  amount: string;
+  phoneNumber: string | null;
+  shortcode: string | null;
+  mpesaReceiptNumber: string | null;
+  resultCode: number | null;
+  resultDesc: string | null;
+  receiverPartyPublicName: string | null;
+  b2cUtilityBalance: string | null;
+  b2cWorkingBalance: string | null;
+  orderId: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  order?: { orderNumber: string } | null;
+  initiatedBy?: { firstName: string; lastName: string; email: string } | null;
+}
+
+export interface MpesaBalance {
+  workingBalance: number | null;
+  utilityBalance: number | null;
+  lastUpdated: string | null;
+}
+
+export interface B2CPaymentRequest {
+  phoneNumber: string;
+  amount: number;
+  commandId?: 'BusinessPayment' | 'SalaryPayment' | 'PromotionPayment';
+  remarks?: string;
+  orderId?: string;
+}

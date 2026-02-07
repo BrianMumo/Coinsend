@@ -27,6 +27,7 @@ const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
 const AdminOrdersPage = lazy(() => import('./pages/admin/AdminOrdersPage'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
+const AdminMpesaPage = lazy(() => import('./pages/admin/AdminMpesaPage'));
 const AdminRatesPage = lazy(() => import('./pages/admin/AdminRatesPage'));
 const AdminLiquidityPage = lazy(() => import('./pages/admin/AdminLiquidityPage'));
 const AdminWalletsPage = lazy(() => import('./pages/admin/AdminWalletsPage'));
@@ -65,6 +66,7 @@ function App() {
         <Route path="/admin" element={<AdminLayout><AdminDashboardPage /></AdminLayout>} />
         <Route path="/admin/orders" element={<AdminLayout><AdminOrdersPage /></AdminLayout>} />
         <Route path="/admin/users" element={<AdminLayout><AdminUsersPage /></AdminLayout>} />
+        <Route path="/admin/mpesa" element={<AdminLayout><AdminMpesaPage /></AdminLayout>} />
         <Route path="/admin/rates" element={<AdminLayout><AdminRatesPage /></AdminLayout>} />
         <Route path="/admin/liquidity" element={<AdminLayout><AdminLiquidityPage /></AdminLayout>} />
         <Route path="/admin/wallets" element={<AdminLayout><AdminWalletsPage /></AdminLayout>} />

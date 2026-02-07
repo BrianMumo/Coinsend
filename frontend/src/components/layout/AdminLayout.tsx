@@ -10,6 +10,7 @@ import {
   TrendingUp,
   LogOut,
   Shield,
+  Smartphone,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -21,6 +22,7 @@ const sidebarLinks = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/admin/orders', icon: Receipt, label: 'Orders' },
   { to: '/admin/users', icon: Users, label: 'Users' },
+  { to: '/admin/mpesa', icon: Smartphone, label: 'M-Pesa' },
   { to: '/admin/rates', icon: TrendingUp, label: 'Exchange Rates' },
   { to: '/admin/liquidity', icon: DollarSign, label: 'Liquidity' },
   { to: '/admin/wallets', icon: Wallet, label: 'Wallets' },

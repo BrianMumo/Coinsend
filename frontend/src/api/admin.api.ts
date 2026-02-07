@@ -9,7 +9,10 @@ import {
   Wallet,
   DashboardStats,
   Pagination,
-  OrderStatus
+  OrderStatus,
+  MpesaTransaction,
+  MpesaBalance,
+  B2CPaymentRequest,
 } from '../types';
 
 export interface AdminLoginData {
@@ -156,6 +159,49 @@ export const adminWalletsApi = {
     data: { isActive?: boolean; label?: string }
   ): Promise<ApiResponse<{ wallet: Wallet }>> => {
     const response = await adminApi.put(`/admin/wallets/${id}`, data);
+    return response.data;
+  },
+};
+
+// M-Pesa Admin API
+export const adminMpesaApi = {
+  // Get cached M-Pesa balance
+  getBalance: async (): Promise<ApiResponse<MpesaBalance>> => {
+    const response = await adminApi.get('/admin/mpesa/balance');
+    return response.data;
+  },
+
+  // Trigger balance refresh (async)
+  refreshBalance: async (): Promise<ApiResponse<{ conversationId: string }>> => {
+    const response = await adminApi.post('/admin/mpesa/balance/refresh');
+    return response.data;
+  },
+
+  // Initiate B2C payment
+  initiateB2CPayment: async (
+    data: B2CPaymentRequest
+  ): Promise<ApiResponse<{ conversationId: string; originatorConversationId: string }>> => {
+    const response = await adminApi.post('/admin/mpesa/b2c', data);
+    return response.data;
+  },
+
+  // Get transaction history
+  getTransactions: async (params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }): Promise<ApiResponse<MpesaTransaction[]> & { pagination: Pagination }> => {
+    const response = await adminApi.get('/admin/mpesa/transactions', { params });
+    return response.data;
+  },
+
+  // Get single transaction
+  getTransaction: async (id: string): Promise<ApiResponse<{ transaction: MpesaTransaction }>> => {
+    const response = await adminApi.get(`/admin/mpesa/transactions/${id}`);
     return response.data;
   },
 };

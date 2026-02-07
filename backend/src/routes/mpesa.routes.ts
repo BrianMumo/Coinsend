@@ -161,4 +161,100 @@ router.get(
   })
 );
 
+// ============ B2C CALLBACK ENDPOINTS ============
+
+/**
+ * B2C Result Callback endpoint (called by Safaricom)
+ * POST /api/mpesa/b2c/result
+ */
+router.post(
+  '/b2c/result',
+  asyncHandler(async (req: Request, res: Response) => {
+    logger.info('B2C Result Callback received:', JSON.stringify(req.body));
+
+    await mpesaService.processB2CCallback(req.body);
+
+    res.json({
+      ResultCode: 0,
+      ResultDesc: 'Callback received successfully',
+    });
+  })
+);
+
+/**
+ * B2C Timeout Callback endpoint (called by Safaricom)
+ * POST /api/mpesa/b2c/timeout
+ */
+router.post(
+  '/b2c/timeout',
+  asyncHandler(async (req: Request, res: Response) => {
+    logger.info('B2C Timeout Callback received:', JSON.stringify(req.body));
+
+    const { OriginatorConversationID } = req.body.Result || {};
+
+    if (OriginatorConversationID) {
+      await prisma.mpesaTransaction.updateMany({
+        where: { originatorConversationId: OriginatorConversationID },
+        data: {
+          status: 'TIMEOUT',
+          resultDesc: 'Transaction timed out',
+          completedAt: new Date(),
+        },
+      });
+    }
+
+    res.json({
+      ResultCode: 0,
+      ResultDesc: 'Timeout received',
+    });
+  })
+);
+
+/**
+ * Account Balance Result Callback endpoint (called by Safaricom)
+ * POST /api/mpesa/balance/result
+ */
+router.post(
+  '/balance/result',
+  asyncHandler(async (req: Request, res: Response) => {
+    logger.info('Balance Callback received:', JSON.stringify(req.body));
+
+    await mpesaService.processBalanceCallback(req.body);
+
+    res.json({
+      ResultCode: 0,
+      ResultDesc: 'Callback received successfully',
+    });
+  })
+);
+
+/**
+ * Account Balance Timeout Callback endpoint (called by Safaricom)
+ * POST /api/mpesa/balance/timeout
+ */
+router.post(
+  '/balance/timeout',
+  asyncHandler(async (req: Request, res: Response) => {
+    logger.info('Balance Timeout Callback received:', JSON.stringify(req.body));
+
+    const { OriginatorConversationID } = req.body.Result || {};
+
+    if (OriginatorConversationID) {
+      await prisma.mpesaTransaction.updateMany({
+        where: { originatorConversationId: OriginatorConversationID },
+        data: {
+          status: 'TIMEOUT',
+          resultDesc: 'Balance query timed out',
+          completedAt: new Date(),
+        },
+      });
+    }
+
+    res.json({
+      ResultCode: 0,
+      ResultDesc: 'Timeout received',
+    });
+  })
+);
+
 export default router;

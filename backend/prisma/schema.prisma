@@ -55,6 +55,19 @@ enum CryptoNetwork {
   BITCOIN
 }
 
+enum MpesaTransactionType {
+  C2B_STK_PUSH
+  B2C_PAYMENT
+  BALANCE_QUERY
+}
+
+enum MpesaTransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  TIMEOUT
+}
+
 // ============ MODELS ============
 
 model User {
@@ -90,7 +103,8 @@ model Admin {
   updatedAt     DateTime   @updatedAt
   lastLoginAt   DateTime?
 
-  processedOrders Order[]  @relation("ProcessedByAdmin")
+  processedOrders     Order[]              @relation("ProcessedByAdmin")
+  mpesaTransactions   MpesaTransaction[]
 
   @@index([email])
   @@index([role])
@@ -143,6 +157,7 @@ model Order {
   // Relations
   user                User          @relation(fields: [userId], references: [id])
   processedBy         Admin?        @relation("ProcessedByAdmin", fields: [processedById], references: [id])
+  mpesaTransactions   MpesaTransaction[]
 
   @@index([userId])
   @@index([orderNumber])
@@ -209,5 +224,40 @@ model AuditLog {
   @@index([userId])
   @@index([adminId])
   @@index([action])
+  @@index([createdAt])
+}
+
+model MpesaTransaction {
+  id                        String                  @id @default(uuid())
+  transactionType           MpesaTransactionType
+  status                    MpesaTransactionStatus  @default(PENDING)
+  originatorConversationId  String?                 @unique
+  conversationId            String?
+  commandId                 String?
+  amount                    Decimal                 @db.Decimal(18, 2)
+  phoneNumber               String?
+  shortcode                 String?
+  mpesaReceiptNumber        String?
+  resultCode                Int?
+  resultDesc                String?
+  receiverPartyPublicName   String?
+  b2cWorkingBalance         Decimal?                @db.Decimal(18, 2)
+  b2cUtilityBalance         Decimal?                @db.Decimal(18, 2)
+  orderId                   String?
+  initiatedById             String?
+  notes                     String?
+  rawRequest                Json?
+  rawResponse               Json?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+  completedAt               DateTime?
+
+  order                     Order?                  @relation(fields: [orderId], references: [id])
+  initiatedBy               Admin?                  @relation(fields: [initiatedById], references: [id])
+
+  @@index([transactionType])
+  @@index([status])
+  @@index([phoneNumber])
+  @@index([mpesaReceiptNumber])
   @@index([createdAt])
 }

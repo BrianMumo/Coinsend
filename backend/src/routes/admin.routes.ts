@@ -2,10 +2,14 @@ import { Router, Response } from 'express';
 import { body } from 'express-validator';
 import { adminService } from '../services/admin.service';
 import { rateService } from '../services/rate.service';
+import { mpesaService } from '../services/mpesa.service';
 import { authenticateAdmin, AdminRequest, requireRole } from '../middleware/adminAuth.middleware';
 import { validate } from '../middleware/validator';
-import { asyncHandler } from '../middleware/errorHandler';
+import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { authLimiter } from '../middleware/rateLimiter';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 const router = Router();
 
@@ -279,6 +283,150 @@ router.put(
       success: true,
       data: { wallet },
       message: 'Wallet updated successfully',
+    });
+  })
+);
+
+// ============ M-PESA ADMIN ROUTES ============
+
+const b2cPaymentValidation = [
+  body('phoneNumber').notEmpty().withMessage('Phone number is required'),
+  body('amount').isFloat({ min: 10, max: 150000 }).withMessage('Amount must be between 10 and 150,000 KES'),
+  body('commandId')
+    .optional()
+    .isIn(['BusinessPayment', 'SalaryPayment', 'PromotionPayment'])
+    .withMessage('Invalid command ID'),
+  body('remarks').optional().trim().isLength({ max: 100 }),
+  body('orderId').optional().isUUID(),
+];
+
+// Get M-Pesa Account Balance (cached)
+router.get(
+  '/mpesa/balance',
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const cachedBalance = await mpesaService.getLatestBalance();
+    res.json({
+      success: true,
+      data: cachedBalance,
+    });
+  })
+);
+
+// Trigger Balance Query (async - result comes via callback)
+router.post(
+  '/mpesa/balance/refresh',
+  requireRole('SUPER_ADMIN', 'ADMIN'),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const result = await mpesaService.queryAccountBalance();
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.adminId,
+        action: 'MPESA_BALANCE_QUERY',
+        entityType: 'MpesaTransaction',
+        details: { conversationId: result.ConversationID },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Balance query initiated. Results will be available shortly.',
+      data: {
+        conversationId: result.ConversationID,
+      },
+    });
+  })
+);
+
+// Initiate B2C Payment (SUPER_ADMIN only)
+router.post(
+  '/mpesa/b2c',
+  requireRole('SUPER_ADMIN'),
+  validate(b2cPaymentValidation),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { phoneNumber, amount, commandId, remarks, orderId } = req.body;
+
+    const result = await mpesaService.initiateB2CPayment(
+      phoneNumber,
+      amount,
+      commandId || 'BusinessPayment',
+      remarks || 'Payment from Coinsend',
+      orderId,
+      req.admin!.adminId
+    );
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.adminId,
+        action: 'MPESA_B2C_PAYMENT',
+        entityType: 'MpesaTransaction',
+        details: {
+          phoneNumber,
+          amount,
+          conversationId: result.ConversationID,
+          orderId,
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'B2C payment initiated successfully',
+      data: {
+        conversationId: result.ConversationID,
+        originatorConversationId: result.OriginatorConversationID,
+      },
+    });
+  })
+);
+
+// Get M-Pesa Transaction History
+router.get(
+  '/mpesa/transactions',
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { page, limit, type, status, startDate, endDate, search } = req.query;
+
+    const result = await mpesaService.getTransactionHistory({
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+      type: type as any,
+      status: status as any,
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+      search: search as string,
+    });
+
+    res.json({
+      success: true,
+      data: result.data,
+      pagination: result.pagination,
+    });
+  })
+);
+
+// Get single M-Pesa Transaction
+router.get(
+  '/mpesa/transactions/:id',
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const transaction = await prisma.mpesaTransaction.findUnique({
+      where: { id: req.params.id },
+      include: {
+        order: true,
+        initiatedBy: {
+          select: { firstName: true, lastName: true, email: true },
+        },
+      },
+    });
+
+    if (!transaction) {
+      throw new AppError('Transaction not found', 404);
+    }
+
+    res.json({
+      success: true,
+      data: { transaction },
     });
   })
 );
