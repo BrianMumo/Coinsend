@@ -2,7 +2,7 @@ import { HTMLAttributes, forwardRef } from 'react';
 import { clsx } from 'clsx';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'pending' | 'paid' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  variant?: 'default' | 'pending' | 'paid' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'success' | 'warning' | 'error';
 }
 
 const variants = {
@@ -13,6 +13,9 @@ const variants = {
   completed: 'bg-green-100 text-green-800',
   failed: 'bg-red-100 text-red-800',
   cancelled: 'bg-gray-100 text-gray-600',
+  success: 'bg-green-100 text-green-800',
+  warning: 'bg-yellow-100 text-yellow-800',
+  error: 'bg-red-100 text-red-800',
 };
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
