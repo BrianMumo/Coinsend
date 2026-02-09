@@ -23,38 +23,53 @@ router.post(
   ],
   validate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
+    logger.info('=== STK PUSH REQUEST RECEIVED ===');
+    logger.info(`Body: ${JSON.stringify(req.body)}`);
+
     const { orderId, phoneNumber } = req.body;
     const userId = req.user!.userId;
 
+    logger.info(`User ID: ${userId}, Order ID: ${orderId}, Phone: ${phoneNumber}`);
+
     // Find the order
+    logger.info(`Looking up order: ${orderId}`);
     const order = await prisma.order.findUnique({
       where: { id: orderId },
     });
 
     if (!order) {
+      logger.error(`Order not found: ${orderId}`);
       throw new AppError('Order not found', 404);
     }
 
+    logger.info(`Order found: ${order.orderNumber}, Status: ${order.status}, Type: ${order.orderType}`);
+
     if (order.userId !== userId) {
+      logger.error(`Access denied - Order userId: ${order.userId}, Request userId: ${userId}`);
       throw new AppError('Access denied', 403);
     }
 
     if (order.status !== 'PENDING') {
+      logger.error(`Invalid order status: ${order.status}`);
       throw new AppError(`Cannot pay for order in ${order.status} status`, 400);
     }
 
     // Check if order requires KES payment (KES_TO_CRYPTO or CROSS_BORDER)
     if (order.orderType !== 'KES_TO_CRYPTO' && order.orderType !== 'CROSS_BORDER') {
+      logger.error(`Invalid order type for STK Push: ${order.orderType}`);
       throw new AppError('STK Push is only available for KES payments', 400);
     }
 
     // Initiate STK Push
+    logger.info(`Calling mpesaService.initiateSTKPush for ${phoneNumber}, Amount: ${order.sourceAmount}`);
     const result = await mpesaService.initiateSTKPush(
       phoneNumber,
       Number(order.sourceAmount),
       order.orderNumber,
       `Coinsend - ${order.orderType === 'KES_TO_CRYPTO' ? 'Buy Crypto' : 'Cross-Border Transfer'}`
     );
+
+    logger.info(`STK Push initiated successfully: ${JSON.stringify(result)}`);
 
     // Store CheckoutRequestID in paymentReference for callback matching
     await prisma.order.update({
@@ -64,6 +79,8 @@ router.post(
         paymentMethod: 'MPESA_STK',
       },
     });
+
+    logger.info(`Order updated with CheckoutRequestID: ${result.CheckoutRequestID}`);
 
     res.json({
       success: true,
