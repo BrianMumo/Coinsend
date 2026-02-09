@@ -91,6 +91,12 @@ class MpesaService {
    * Get OAuth access token from Safaricom
    */
   async getAccessToken(): Promise<string> {
+    // Validate credentials are configured
+    if (!config.mpesa.consumerKey || !config.mpesa.consumerSecret) {
+      logger.error('M-Pesa credentials not configured. Set MPESA_CONSUMER_KEY and MPESA_CONSUMER_SECRET');
+      throw new Error('M-Pesa is not configured. Please contact support.');
+    }
+
     const auth = Buffer.from(
       `${config.mpesa.consumerKey}:${config.mpesa.consumerSecret}`
     ).toString('base64');
@@ -108,7 +114,7 @@ class MpesaService {
       return response.data.access_token;
     } catch (error: any) {
       logger.error('Failed to get M-Pesa access token:', error.response?.data || error.message);
-      throw new Error('Failed to authenticate with M-Pesa');
+      throw new Error('Failed to authenticate with M-Pesa. Check credentials.');
     }
   }
 
@@ -156,6 +162,16 @@ class MpesaService {
     accountReference: string,
     transactionDesc: string = 'Payment'
   ): Promise<STKPushResponse> {
+    // Validate required configuration
+    if (!config.mpesa.passkey) {
+      logger.error('M-Pesa passkey not configured. Set MPESA_PASSKEY');
+      throw new Error('M-Pesa is not configured. Please contact support.');
+    }
+    if (!config.mpesa.callbackUrl) {
+      logger.error('M-Pesa callback URL not configured. Set MPESA_CALLBACK_URL');
+      throw new Error('M-Pesa is not configured. Please contact support.');
+    }
+
     const accessToken = await this.getAccessToken();
     const { password, timestamp } = this.generatePassword();
     const formattedPhone = this.formatPhoneNumber(phoneNumber);
@@ -176,6 +192,7 @@ class MpesaService {
 
     try {
       logger.info(`Initiating STK Push for ${formattedPhone}, Amount: ${amount}, Ref: ${accountReference}`);
+      logger.info(`Using shortcode: ${config.mpesa.shortcode}, Callback: ${config.mpesa.callbackUrl}`);
 
       const response = await axios.post(
         `${this.baseUrl}/mpesa/stkpush/v1/processrequest`,
@@ -192,7 +209,8 @@ class MpesaService {
       return response.data;
     } catch (error: any) {
       logger.error('STK Push failed:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.errorMessage || 'Failed to initiate M-Pesa payment');
+      const errorMsg = error.response?.data?.errorMessage || error.response?.data?.ResultDesc || 'Failed to initiate M-Pesa payment';
+      throw new Error(errorMsg);
     }
   }
 
