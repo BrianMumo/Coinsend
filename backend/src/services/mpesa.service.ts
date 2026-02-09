@@ -472,7 +472,7 @@ class MpesaService {
         b2cUtilityBalance,
         b2cWorkingBalance,
         completedAt: new Date(),
-        rawResponse: callbackData,
+        rawResponse: JSON.parse(JSON.stringify(callbackData)),
       },
     });
 
@@ -539,7 +539,7 @@ class MpesaService {
           b2cWorkingBalance: accountBalance,
           b2cUtilityBalance: utilityBalance,
           completedAt: new Date(),
-          rawResponse: callbackData,
+          rawResponse: JSON.parse(JSON.stringify(callbackData)),
         },
       });
     }
