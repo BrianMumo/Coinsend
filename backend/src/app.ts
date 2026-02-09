@@ -16,6 +16,10 @@ import mpesaRoutes from './routes/mpesa.routes';
 
 const app = express();
 
+// Trust proxy - required for Railway/cloud deployments behind reverse proxy
+// This fixes express-rate-limit X-Forwarded-For header validation
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
