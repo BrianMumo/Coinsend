@@ -19,13 +19,13 @@ interface AdminLayoutProps {
 }
 
 const sidebarLinks = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/admin/orders', icon: Receipt, label: 'Orders' },
-  { to: '/admin/users', icon: Users, label: 'Users' },
-  { to: '/admin/mpesa', icon: Smartphone, label: 'M-Pesa' },
-  { to: '/admin/rates', icon: TrendingUp, label: 'Exchange Rates' },
-  { to: '/admin/liquidity', icon: DollarSign, label: 'Liquidity' },
-  { to: '/admin/wallets', icon: Wallet, label: 'Wallets' },
+  { to: '/mumo', icon: LayoutDashboard, label: 'Dashboard', exact: true },
+  { to: '/mumo/orders', icon: Receipt, label: 'Orders' },
+  { to: '/mumo/users', icon: Users, label: 'Users' },
+  { to: '/mumo/mpesa', icon: Smartphone, label: 'M-Pesa' },
+  { to: '/mumo/rates', icon: TrendingUp, label: 'Exchange Rates' },
+  { to: '/mumo/liquidity', icon: DollarSign, label: 'Liquidity' },
+  { to: '/mumo/wallets', icon: Wallet, label: 'Wallets' },
 ];
 
 export const AdminLayout = ({ children }: AdminLayoutProps) => {
@@ -33,7 +33,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
   const { isAuthenticated, admin, logout } = useAdminAuthStore();
 
   if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/mumo/login" replace />;
   }
 
   return (
@@ -69,7 +69,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
             {sidebarLinks.map((link) => {
               const isActive = link.exact
                 ? location.pathname === link.to
-                : location.pathname.startsWith(link.to) && link.to !== '/admin';
+                : location.pathname.startsWith(link.to) && link.to !== '/mumo';
               return (
                 <Link
                   key={link.to}

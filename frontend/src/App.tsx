@@ -38,7 +38,7 @@ const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage'));
 
 function App() {
   const location = useLocation();
-  const isAdminRoute = location.pathname.startsWith('/admin');
+  const isAdminRoute = location.pathname.startsWith('/mumo');
 
   return (
     <>
@@ -64,14 +64,14 @@ function App() {
         <Route path="/profile" element={<UserLayout><ProfilePage /></UserLayout>} />
 
         {/* Admin routes */}
-        <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route path="/admin" element={<AdminLayout><AdminDashboardPage /></AdminLayout>} />
-        <Route path="/admin/orders" element={<AdminLayout><AdminOrdersPage /></AdminLayout>} />
-        <Route path="/admin/users" element={<AdminLayout><AdminUsersPage /></AdminLayout>} />
-        <Route path="/admin/mpesa" element={<AdminLayout><AdminMpesaPage /></AdminLayout>} />
-        <Route path="/admin/rates" element={<AdminLayout><AdminRatesPage /></AdminLayout>} />
-        <Route path="/admin/liquidity" element={<AdminLayout><AdminLiquidityPage /></AdminLayout>} />
-        <Route path="/admin/wallets" element={<AdminLayout><AdminWalletsPage /></AdminLayout>} />
+        <Route path="/mumo/login" element={<AdminLoginPage />} />
+        <Route path="/mumo" element={<AdminLayout><AdminDashboardPage /></AdminLayout>} />
+        <Route path="/mumo/orders" element={<AdminLayout><AdminOrdersPage /></AdminLayout>} />
+        <Route path="/mumo/users" element={<AdminLayout><AdminUsersPage /></AdminLayout>} />
+        <Route path="/mumo/mpesa" element={<AdminLayout><AdminMpesaPage /></AdminLayout>} />
+        <Route path="/mumo/rates" element={<AdminLayout><AdminRatesPage /></AdminLayout>} />
+        <Route path="/mumo/liquidity" element={<AdminLayout><AdminLiquidityPage /></AdminLayout>} />
+        <Route path="/mumo/wallets" element={<AdminLayout><AdminWalletsPage /></AdminLayout>} />
 
         {/* 404 Not Found */}
         <Route path="*" element={<NotFoundPage />} />

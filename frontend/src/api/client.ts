@@ -54,7 +54,7 @@ adminApi.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       useAdminAuthStore.getState().logout();
-      window.location.href = '/admin/login';
+      window.location.href = '/mumo/login';
     }
     return Promise.reject(error);
   }
