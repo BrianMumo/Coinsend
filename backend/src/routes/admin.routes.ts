@@ -1,8 +1,9 @@
 import { Router, Response } from 'express';
-import { body } from 'express-validator';
+import { body, query } from 'express-validator';
 import { adminService } from '../services/admin.service';
 import { rateService } from '../services/rate.service';
 import { mpesaService } from '../services/mpesa.service';
+import { tronService } from '../services/tron.service';
 import { authenticateAdmin, AdminRequest, requireRole } from '../middleware/adminAuth.middleware';
 import { validate } from '../middleware/validator';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
@@ -584,6 +585,127 @@ router.post(
       success: true,
       message: `Transaction marked as completed`,
       data: { transaction: updatedTransaction },
+    });
+  })
+);
+
+// ============ TRON/USDT MANAGEMENT ============
+
+// Get TRON wallet summary
+router.get(
+  '/tron/wallet',
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const summary = await tronService.getWalletSummary();
+    res.json({
+      success: true,
+      data: summary,
+    });
+  })
+);
+
+// Get TRON transactions
+router.get(
+  '/tron/transactions',
+  validate([
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('type').optional().isIn(['DEPOSIT', 'WITHDRAWAL']),
+    query('status').optional().isIn(['PENDING', 'CONFIRMED', 'COMPLETED', 'FAILED']),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { page, limit, type, status } = req.query;
+
+    const result = await tronService.getRecentTransactions({
+      page: page ? parseInt(page as string) : 1,
+      limit: limit ? parseInt(limit as string) : 20,
+      type: type as 'DEPOSIT' | 'WITHDRAWAL' | undefined,
+      status: status as 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'FAILED' | undefined,
+    });
+
+    res.json({
+      success: true,
+      data: result.data,
+      pagination: result.pagination,
+    });
+  })
+);
+
+// Manually check for new deposits
+router.post(
+  '/tron/check-deposits',
+  requireRole('SUPER_ADMIN', 'ADMIN'),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const newDeposits = await tronService.checkNewDeposits();
+
+    res.json({
+      success: true,
+      message: `Checked for deposits. Found ${newDeposits} new deposit(s).`,
+      data: { newDeposits },
+    });
+  })
+);
+
+// Send USDT (SUPER_ADMIN only)
+const sendUsdtValidation = [
+  body('toAddress').notEmpty().withMessage('Recipient address is required'),
+  body('amount').isFloat({ min: 1 }).withMessage('Amount must be at least 1 USDT'),
+  body('orderId').optional().trim(),
+];
+
+router.post(
+  '/tron/send',
+  requireRole('SUPER_ADMIN'),
+  validate(sendUsdtValidation),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { toAddress, amount, orderId } = req.body;
+
+    // Validate address
+    if (!tronService.isValidAddress(toAddress)) {
+      throw new AppError('Invalid TRON address', 400);
+    }
+
+    const result = await tronService.sendUsdt(toAddress, amount, orderId);
+
+    if (!result.success) {
+      throw new AppError(result.error || 'Failed to send USDT', 400);
+    }
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.adminId,
+        action: 'TRON_SEND_USDT',
+        entityType: 'CryptoTransaction',
+        details: {
+          toAddress,
+          amount,
+          txHash: result.txHash,
+          orderId,
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully sent ${amount} USDT`,
+      data: { txHash: result.txHash },
+    });
+  })
+);
+
+// Validate TRON address
+router.get(
+  '/tron/validate-address',
+  validate([
+    query('address').notEmpty().withMessage('Address is required'),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { address } = req.query;
+    const isValid = tronService.isValidAddress(address as string);
+
+    res.json({
+      success: true,
+      data: { address, isValid },
     });
   })
 );

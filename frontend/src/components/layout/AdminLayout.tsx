@@ -11,6 +11,7 @@ import {
   LogOut,
   Shield,
   Smartphone,
+  Coins,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -23,6 +24,7 @@ const sidebarLinks = [
   { to: '/mumo/orders', icon: Receipt, label: 'Orders' },
   { to: '/mumo/users', icon: Users, label: 'Users' },
   { to: '/mumo/mpesa', icon: Smartphone, label: 'M-Pesa' },
+  { to: '/mumo/tron', icon: Coins, label: 'TRON Wallet' },
   { to: '/mumo/rates', icon: TrendingUp, label: 'Exchange Rates' },
   { to: '/mumo/liquidity', icon: DollarSign, label: 'Liquidity' },
   { to: '/mumo/wallets', icon: Wallet, label: 'Wallets' },

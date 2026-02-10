@@ -176,6 +176,7 @@ model Order {
   processedBy         Admin?        @relation("ProcessedByAdmin", fields: [processedById], references: [id])
   mpesaTransactions   MpesaTransaction[]
   balanceTransactions BalanceTransaction[]
+  cryptoTransactions  CryptoTransaction[]
 
   @@index([userId])
   @@index([orderNumber])
@@ -324,4 +325,66 @@ model BalanceTransaction {
   @@index([orderId])
   @@index([reference])
   @@index([createdAt])
+}
+
+// ============ CRYPTO TRANSACTIONS ============
+
+enum CryptoTransactionType {
+  DEPOSIT       // Incoming USDT from user
+  WITHDRAWAL    // Outgoing USDT to user
+}
+
+enum CryptoTransactionStatus {
+  PENDING       // Waiting for confirmations
+  CONFIRMED     // Confirmed on blockchain
+  COMPLETED     // Processed by system
+  FAILED        // Failed transaction
+}
+
+model CryptoTransaction {
+  id              String                    @id @default(uuid())
+  type            CryptoTransactionType
+  status          CryptoTransactionStatus   @default(PENDING)
+  currency        CryptoCurrency            @default(USDT)
+  network         CryptoNetwork             @default(TRON)
+
+  // Transaction details
+  txHash          String                    @unique
+  fromAddress     String
+  toAddress       String
+  amount          Decimal                   @db.Decimal(18, 6)
+  fee             Decimal?                  @db.Decimal(18, 6)
+
+  // Block info
+  blockNumber     BigInt?
+  confirmations   Int                       @default(0)
+
+  // Link to order (optional)
+  orderId         String?
+
+  // Timestamps
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  confirmedAt     DateTime?
+
+  // Raw data
+  rawData         Json?
+  notes           String?
+
+  order           Order?                    @relation(fields: [orderId], references: [id])
+
+  @@index([type])
+  @@index([status])
+  @@index([txHash])
+  @@index([fromAddress])
+  @@index([toAddress])
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+// System config for storing things like last processed block
+model SystemConfig {
+  key             String                    @id
+  value           String
+  updatedAt       DateTime                  @updatedAt
 }

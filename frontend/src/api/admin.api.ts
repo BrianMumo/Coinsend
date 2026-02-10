@@ -260,3 +260,83 @@ export const adminBalanceApi = {
     return response.data;
   },
 };
+
+// TRON/USDT API Types
+export interface TronWalletSummary {
+  hotWallet: string;
+  network: string;
+  balances: {
+    trx: number;
+    usdt: number;
+  };
+  today: {
+    deposits: { count: number; amount: number };
+    withdrawals: { count: number; amount: number };
+  };
+}
+
+export interface CryptoTransaction {
+  id: string;
+  type: 'DEPOSIT' | 'WITHDRAWAL';
+  status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'FAILED';
+  currency: string;
+  network: string;
+  txHash: string;
+  fromAddress: string;
+  toAddress: string;
+  amount: string;
+  fee: string | null;
+  blockNumber: string | null;
+  confirmations: number;
+  orderId: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+  notes: string | null;
+  order?: { orderNumber: string } | null;
+}
+
+// TRON Admin API
+export const adminTronApi = {
+  // Get wallet summary
+  getWalletSummary: async (): Promise<ApiResponse<TronWalletSummary>> => {
+    const response = await adminApi.get('/admin/tron/wallet');
+    return response.data;
+  },
+
+  // Get transactions
+  getTransactions: async (params?: {
+    page?: number;
+    limit?: number;
+    type?: 'DEPOSIT' | 'WITHDRAWAL';
+    status?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'FAILED';
+  }): Promise<ApiResponse<CryptoTransaction[]> & { pagination: any }> => {
+    const response = await adminApi.get('/admin/tron/transactions', { params });
+    return response.data;
+  },
+
+  // Check for new deposits
+  checkDeposits: async (): Promise<ApiResponse<{ newDeposits: number }>> => {
+    const response = await adminApi.post('/admin/tron/check-deposits');
+    return response.data;
+  },
+
+  // Send USDT
+  sendUsdt: async (
+    toAddress: string,
+    amount: number,
+    orderId?: string
+  ): Promise<ApiResponse<{ txHash: string }>> => {
+    const response = await adminApi.post('/admin/tron/send', {
+      toAddress,
+      amount,
+      orderId,
+    });
+    return response.data;
+  },
+
+  // Validate address
+  validateAddress: async (address: string): Promise<ApiResponse<{ address: string; isValid: boolean }>> => {
+    const response = await adminApi.get('/admin/tron/validate-address', { params: { address } });
+    return response.data;
+  },
+};

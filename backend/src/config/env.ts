@@ -37,6 +37,14 @@ export const config = {
     url: process.env.DATABASE_URL,
   },
 
+  tron: {
+    network: process.env.TRON_NETWORK || 'mainnet', // 'mainnet' or 'shasta' (testnet)
+    apiKey: process.env.TRON_API_KEY || '',
+    privateKey: process.env.TRON_PRIVATE_KEY || '',
+    hotWalletAddress: process.env.TRON_HOT_WALLET || '',
+    usdtContract: process.env.TRON_USDT_CONTRACT || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', // Mainnet USDT
+  },
+
   isDevelopment: process.env.NODE_ENV === 'development',
   isProduction: process.env.NODE_ENV === 'production',
 };
