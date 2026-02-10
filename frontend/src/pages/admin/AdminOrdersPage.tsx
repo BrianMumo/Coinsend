@@ -114,7 +114,7 @@ const AdminOrdersPage = () => {
 
   const nextStatusOptions: Record<string, string[]> = {
     PENDING: ['PAID', 'CANCELLED', 'EXPIRED'],
-    PAID: ['PROCESSING', 'CANCELLED', 'FAILED'],
+    PAID: ['PROCESSING', 'COMPLETED', 'CANCELLED', 'FAILED'],
     PROCESSING: ['COMPLETED', 'FAILED'],
   };
 
