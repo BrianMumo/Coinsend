@@ -41,7 +41,7 @@ const AdminLoginPage = () => {
       const response = await adminAuthApi.login(data);
       if (response.success && response.data) {
         setAuth(response.data.token, response.data.admin);
-        navigate('/admin');
+        navigate('/mumo');
       }
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Login failed. Please try again.');
