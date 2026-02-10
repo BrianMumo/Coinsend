@@ -78,6 +78,30 @@ interface BalanceCallbackData {
   };
 }
 
+interface ReversalResponse {
+  OriginatorConversationID: string;
+  ConversationID: string;
+  ResponseCode: string;
+  ResponseDescription: string;
+}
+
+interface ReversalCallbackData {
+  Result: {
+    ResultType: number;
+    ResultCode: number;
+    ResultDesc: string;
+    OriginatorConversationID: string;
+    ConversationID: string;
+    TransactionID: string;
+    ResultParameters?: {
+      ResultParameter: Array<{
+        Key: string;
+        Value: string | number;
+      }>;
+    };
+  };
+}
+
 class MpesaService {
   private baseUrl: string;
 
@@ -678,6 +702,153 @@ class MpesaService {
       utilityBalance: latestBalanceQuery?.b2cUtilityBalance ? Number(latestBalanceQuery.b2cUtilityBalance) : null,
       lastUpdated: latestBalanceQuery?.completedAt || null,
     };
+  }
+
+  /**
+   * Initiate Transaction Reversal
+   * Used to reverse a B2C payment that was sent to wrong number
+   */
+  async initiateReversal(
+    transactionId: string, // The M-Pesa receipt number of the transaction to reverse
+    amount: number,
+    remarks: string = 'Transaction Reversal',
+    adminId?: string
+  ): Promise<ReversalResponse> {
+    const accessToken = await this.getAccessToken();
+
+    // Find the original transaction
+    const originalTransaction = await prisma.mpesaTransaction.findFirst({
+      where: {
+        mpesaReceiptNumber: transactionId,
+        transactionType: 'B2C_PAYMENT',
+        status: 'SUCCESS',
+        isReversed: false,
+      },
+    });
+
+    if (!originalTransaction) {
+      throw new Error('Original transaction not found or already reversed');
+    }
+
+    const payload = {
+      Initiator: config.mpesa.initiatorName,
+      SecurityCredential: config.mpesa.securityCredential,
+      CommandID: 'TransactionReversal',
+      TransactionID: transactionId,
+      Amount: Math.round(amount),
+      ReceiverParty: config.mpesa.shortcode,
+      RecieverIdentifierType: '4', // 4 = Organization shortcode
+      ResultURL: `${config.mpesa.resultUrl}/reversal/result`,
+      QueueTimeOutURL: `${config.mpesa.timeoutUrl}/reversal/timeout`,
+      Remarks: remarks,
+      Occasion: `REV-${Date.now()}`,
+    };
+
+    try {
+      logger.info(`Initiating reversal for transaction ${transactionId}, Amount: ${amount}`);
+
+      const response = await axios.post(
+        `${this.baseUrl}/mpesa/reversal/v1/request`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      // Store reversal transaction in database
+      await prisma.mpesaTransaction.create({
+        data: {
+          transactionType: 'REVERSAL',
+          status: 'PENDING',
+          originatorConversationId: response.data.OriginatorConversationID,
+          conversationId: response.data.ConversationID,
+          commandId: 'TransactionReversal',
+          amount,
+          phoneNumber: originalTransaction.phoneNumber,
+          shortcode: config.mpesa.shortcode,
+          initiatedById: adminId,
+          reversedTransactionId: originalTransaction.id,
+          notes: `Reversal of ${transactionId}: ${remarks}`,
+          rawRequest: { ...payload, SecurityCredential: '[REDACTED]' },
+          rawResponse: response.data,
+        },
+      });
+
+      logger.info('Reversal initiated:', response.data);
+      return response.data;
+    } catch (error: any) {
+      logger.error('Reversal failed:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.errorMessage || 'Failed to initiate reversal');
+    }
+  }
+
+  /**
+   * Process Reversal callback from Safaricom
+   */
+  async processReversalCallback(callbackData: ReversalCallbackData): Promise<void> {
+    const { Result } = callbackData;
+    const { ResultCode, ResultDesc, OriginatorConversationID, TransactionID } = Result;
+
+    logger.info(`Reversal Callback - OriginatorConversationID: ${OriginatorConversationID}, ResultCode: ${ResultCode}`);
+
+    // Find the reversal transaction
+    const reversalTransaction = await prisma.mpesaTransaction.findUnique({
+      where: { originatorConversationId: OriginatorConversationID },
+    });
+
+    if (!reversalTransaction) {
+      logger.warn(`No reversal transaction found for OriginatorConversationID: ${OriginatorConversationID}`);
+      return;
+    }
+
+    // Update reversal transaction
+    await prisma.mpesaTransaction.update({
+      where: { id: reversalTransaction.id },
+      data: {
+        status: ResultCode === 0 ? 'SUCCESS' : 'FAILED',
+        resultCode: ResultCode,
+        resultDesc: ResultDesc,
+        mpesaReceiptNumber: TransactionID,
+        completedAt: new Date(),
+        rawResponse: JSON.parse(JSON.stringify(callbackData)),
+      },
+    });
+
+    // If reversal successful, mark original transaction as reversed
+    if (ResultCode === 0 && reversalTransaction.reversedTransactionId) {
+      await prisma.mpesaTransaction.update({
+        where: { id: reversalTransaction.reversedTransactionId },
+        data: {
+          isReversed: true,
+          notes: `Reversed on ${new Date().toISOString()}. Reversal receipt: ${TransactionID}`,
+        },
+      });
+      logger.info(`Original transaction ${reversalTransaction.reversedTransactionId} marked as reversed`);
+    }
+
+    logger.info(`Reversal ${OriginatorConversationID} ${ResultCode === 0 ? 'succeeded' : 'failed'}: ${ResultDesc}`);
+  }
+
+  /**
+   * Get transaction by ID for reversal
+   */
+  async getTransactionForReversal(transactionId: string) {
+    return prisma.mpesaTransaction.findFirst({
+      where: {
+        id: transactionId,
+        transactionType: 'B2C_PAYMENT',
+        status: 'SUCCESS',
+        isReversed: false,
+      },
+      include: {
+        initiatedBy: {
+          select: { firstName: true, lastName: true, email: true },
+        },
+      },
+    });
   }
 }
 

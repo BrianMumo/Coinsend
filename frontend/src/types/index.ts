@@ -174,7 +174,7 @@ export interface DashboardStats {
 }
 
 // M-Pesa types
-export type MpesaTransactionType = 'C2B_STK_PUSH' | 'B2C_PAYMENT' | 'BALANCE_QUERY';
+export type MpesaTransactionType = 'C2B_STK_PUSH' | 'B2C_PAYMENT' | 'BALANCE_QUERY' | 'REVERSAL';
 export type MpesaTransactionStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'TIMEOUT';
 
 export interface MpesaTransaction {
@@ -198,6 +198,9 @@ export interface MpesaTransaction {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  // Reversal related fields
+  reversedTransactionId: string | null;
+  isReversed: boolean;
   order?: { orderNumber: string } | null;
   initiatedBy?: { firstName: string; lastName: string; email: string } | null;
 }

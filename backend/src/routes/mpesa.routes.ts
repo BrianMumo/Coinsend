@@ -328,4 +328,53 @@ router.post(
   })
 );
 
+// ============ REVERSAL CALLBACK ENDPOINTS ============
+
+/**
+ * Reversal Result Callback endpoint (called by Safaricom)
+ * POST /api/mpesa/reversal/result
+ */
+router.post(
+  '/reversal/result',
+  asyncHandler(async (req: Request, res: Response) => {
+    logger.info('Reversal Result Callback received:', JSON.stringify(req.body));
+
+    await mpesaService.processReversalCallback(req.body);
+
+    res.json({
+      ResultCode: 0,
+      ResultDesc: 'Callback received successfully',
+    });
+  })
+);
+
+/**
+ * Reversal Timeout Callback endpoint (called by Safaricom)
+ * POST /api/mpesa/reversal/timeout
+ */
+router.post(
+  '/reversal/timeout',
+  asyncHandler(async (req: Request, res: Response) => {
+    logger.info('Reversal Timeout Callback received:', JSON.stringify(req.body));
+
+    const { OriginatorConversationID } = req.body.Result || {};
+
+    if (OriginatorConversationID) {
+      await prisma.mpesaTransaction.updateMany({
+        where: { originatorConversationId: OriginatorConversationID },
+        data: {
+          status: 'TIMEOUT',
+          resultDesc: 'Reversal request timed out',
+          completedAt: new Date(),
+        },
+      });
+    }
+
+    res.json({
+      ResultCode: 0,
+      ResultDesc: 'Timeout received',
+    });
+  })
+);
+
 export default router;

@@ -59,6 +59,7 @@ enum MpesaTransactionType {
   C2B_STK_PUSH
   B2C_PAYMENT
   BALANCE_QUERY
+  REVERSAL
 }
 
 enum MpesaTransactionStatus {
@@ -269,6 +270,10 @@ model MpesaTransaction {
   updatedAt                 DateTime                @updatedAt
   completedAt               DateTime?
 
+  // For reversals - links to the original transaction being reversed
+  reversedTransactionId     String?
+  isReversed                Boolean                 @default(false)
+
   order                     Order?                  @relation(fields: [orderId], references: [id])
   initiatedBy               Admin?                  @relation(fields: [initiatedById], references: [id])
 
@@ -277,6 +282,7 @@ model MpesaTransaction {
   @@index([phoneNumber])
   @@index([mpesaReceiptNumber])
   @@index([createdAt])
+  @@index([reversedTransactionId])
 }
 
 model UserBalance {

@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   ArrowDownLeft,
   ArrowUpRight,
+  RotateCcw,
 } from 'lucide-react';
 
 const AdminMpesaPage = () => {
@@ -57,6 +58,9 @@ const AdminMpesaPage = () => {
   const [pendingBalanceTx, setPendingBalanceTx] = useState<PendingBalanceTransaction[]>([]);
   const [isLoadingPendingTx, setIsLoadingPendingTx] = useState(true);
   const [completingTxId, setCompletingTxId] = useState<string | null>(null);
+
+  // Reversal state
+  const [reversingTxId, setReversingTxId] = useState<string | null>(null);
 
   // Messages
   const [error, setError] = useState<string | null>(null);
@@ -186,6 +190,46 @@ const AdminMpesaPage = () => {
     }
   };
 
+  // Handle transaction reversal
+  const handleReversal = async (tx: MpesaTransaction) => {
+    const confirmMessage = `Are you sure you want to reverse this B2C payment?\n\nAmount: KES ${parseFloat(tx.amount).toLocaleString()}\nPhone: ${tx.phoneNumber}\nReceipt: ${tx.mpesaReceiptNumber}\n\nThis action cannot be undone.`;
+
+    if (!confirm(confirmMessage)) return;
+
+    setReversingTxId(tx.id);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await adminMpesaApi.initiateReversal(
+        tx.id,
+        parseFloat(tx.amount),
+        `Reversal of payment to ${tx.phoneNumber}`
+      );
+
+      if (response.success) {
+        setSuccess(`Reversal initiated successfully. Conversation ID: ${response.data?.conversationId}. Please wait for the reversal to be processed.`);
+        // Refresh transactions after a delay
+        setTimeout(() => fetchTransactions(), 5000);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Failed to initiate reversal');
+    } finally {
+      setReversingTxId(null);
+    }
+  };
+
+  // Check if a transaction can be reversed
+  const canReverse = (tx: MpesaTransaction): boolean => {
+    return (
+      tx.transactionType === 'B2C_PAYMENT' &&
+      tx.status === 'SUCCESS' &&
+      !tx.isReversed &&
+      !!tx.mpesaReceiptNumber &&
+      isSuperAdmin
+    );
+  };
+
   useEffect(() => {
     fetchBalance();
     fetchTransactions();
@@ -216,13 +260,25 @@ const AdminMpesaPage = () => {
     );
   };
 
-  const getTypeBadge = (type: string) => {
+  const getTypeBadge = (type: string, isReversed?: boolean) => {
     const labels: Record<string, string> = {
       C2B_STK_PUSH: 'STK Push',
       B2C_PAYMENT: 'B2C Payment',
       BALANCE_QUERY: 'Balance Query',
+      REVERSAL: 'Reversal',
     };
-    return <Badge variant="default">{labels[type] || type}</Badge>;
+    return (
+      <div className="flex flex-col gap-1">
+        <Badge variant={type === 'REVERSAL' ? 'warning' : 'default'}>
+          {labels[type] || type}
+        </Badge>
+        {isReversed && (
+          <Badge variant="error" className="text-xs">
+            REVERSED
+          </Badge>
+        )}
+      </div>
+    );
   };
 
   const typeOptions = [
@@ -230,6 +286,7 @@ const AdminMpesaPage = () => {
     { value: 'C2B_STK_PUSH', label: 'STK Push' },
     { value: 'B2C_PAYMENT', label: 'B2C Payment' },
     { value: 'BALANCE_QUERY', label: 'Balance Query' },
+    { value: 'REVERSAL', label: 'Reversal' },
   ];
 
   const statusOptions = [
@@ -545,16 +602,17 @@ const AdminMpesaPage = () => {
                     <th className="text-left py-3 px-4 font-medium">Receipt</th>
                     <th className="text-left py-3 px-4 font-medium">Status</th>
                     <th className="text-left py-3 px-4 font-medium">Initiated By</th>
+                    {isSuperAdmin && <th className="text-left py-3 px-4 font-medium">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {transactions.map((tx) => (
-                    <tr key={tx.id} className="border-b hover:bg-gray-50">
+                    <tr key={tx.id} className={`border-b hover:bg-gray-50 ${tx.isReversed ? 'bg-red-50' : ''}`}>
                       <td className="py-3 px-4 whitespace-nowrap">
                         {formatDate(tx.createdAt)}
                       </td>
                       <td className="py-3 px-4">
-                        {getTypeBadge(tx.transactionType)}
+                        {getTypeBadge(tx.transactionType, tx.isReversed)}
                       </td>
                       <td className="py-3 px-4">
                         {tx.phoneNumber || '-'}
@@ -580,6 +638,23 @@ const AdminMpesaPage = () => {
                           ? `${tx.initiatedBy.firstName} ${tx.initiatedBy.lastName}`
                           : '-'}
                       </td>
+                      {isSuperAdmin && (
+                        <td className="py-3 px-4">
+                          {canReverse(tx) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 border-red-300 hover:bg-red-50"
+                              onClick={() => handleReversal(tx)}
+                              isLoading={reversingTxId === tx.id}
+                              disabled={reversingTxId !== null}
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" />
+                              Reverse
+                            </Button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

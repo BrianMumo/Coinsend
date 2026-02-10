@@ -431,6 +431,63 @@ router.get(
   })
 );
 
+// Initiate Transaction Reversal (SUPER_ADMIN only)
+const reversalValidation = [
+  body('transactionId').notEmpty().withMessage('Transaction ID is required'),
+  body('amount').isFloat({ min: 1 }).withMessage('Amount must be greater than 0'),
+  body('remarks').optional().trim().isLength({ max: 100 }),
+];
+
+router.post(
+  '/mpesa/reversal',
+  requireRole('SUPER_ADMIN'),
+  validate(reversalValidation),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { transactionId, amount, remarks } = req.body;
+
+    // Find the original transaction by ID to get the M-Pesa receipt number
+    const originalTx = await mpesaService.getTransactionForReversal(transactionId);
+    if (!originalTx) {
+      throw new AppError('Transaction not found or cannot be reversed', 404);
+    }
+
+    if (!originalTx.mpesaReceiptNumber) {
+      throw new AppError('Transaction has no M-Pesa receipt number', 400);
+    }
+
+    const result = await mpesaService.initiateReversal(
+      originalTx.mpesaReceiptNumber,
+      amount,
+      remarks || 'Transaction Reversal',
+      req.admin!.adminId
+    );
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.adminId,
+        action: 'MPESA_REVERSAL',
+        entityType: 'MpesaTransaction',
+        details: {
+          originalTransactionId: transactionId,
+          mpesaReceiptNumber: originalTx.mpesaReceiptNumber,
+          amount,
+          conversationId: result.ConversationID,
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Reversal initiated successfully',
+      data: {
+        conversationId: result.ConversationID,
+        originatorConversationId: result.OriginatorConversationID,
+      },
+    });
+  })
+);
+
 // ============ BALANCE TRANSACTION MANAGEMENT ============
 
 // Get pending balance transactions (for reconciliation)

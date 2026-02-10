@@ -204,6 +204,20 @@ export const adminMpesaApi = {
     const response = await adminApi.get(`/admin/mpesa/transactions/${id}`);
     return response.data;
   },
+
+  // Initiate transaction reversal
+  initiateReversal: async (
+    transactionId: string,
+    amount: number,
+    remarks?: string
+  ): Promise<ApiResponse<{ conversationId: string; originatorConversationId: string }>> => {
+    const response = await adminApi.post('/admin/mpesa/reversal', {
+      transactionId,
+      amount,
+      remarks,
+    });
+    return response.data;
+  },
 };
 
 // Balance Transactions Admin API (for reconciliation)
