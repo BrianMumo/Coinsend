@@ -47,6 +47,12 @@ router.get(
         _count: {
           select: { orders: true },
         },
+        balance: {
+          select: {
+            balance: true,
+            currency: true,
+          },
+        },
       },
     });
 
@@ -54,9 +60,20 @@ router.get(
       throw new AppError('User not found', 404);
     }
 
+    // Format balance for response
+    const userData = {
+      ...user,
+      balance: user.balance
+        ? {
+            balance: user.balance.balance.toString(),
+            currency: user.balance.currency,
+          }
+        : null,
+    };
+
     res.json({
       success: true,
-      data: { user },
+      data: { user: userData },
     });
   })
 );

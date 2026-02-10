@@ -13,6 +13,7 @@ import orderRoutes from './routes/order.routes';
 import rateRoutes from './routes/rate.routes';
 import adminRoutes from './routes/admin.routes';
 import mpesaRoutes from './routes/mpesa.routes';
+import balanceRoutes from './routes/balance.routes';
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/rates', rateRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/mpesa', mpesaRoutes);
+app.use('/api/balance', balanceRoutes);
 
 // Error handling
 app.use(notFoundHandler);

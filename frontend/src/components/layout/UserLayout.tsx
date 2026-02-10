@@ -9,6 +9,7 @@ import {
   User,
   LogOut,
   MessageCircle,
+  Wallet,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -21,6 +22,7 @@ interface UserLayoutProps {
 
 const sidebarLinks = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/wallet', icon: Wallet, label: 'Wallet' },
   { to: '/orders/new', icon: PlusCircle, label: 'New Order' },
   { to: '/orders', icon: Receipt, label: 'My Orders' },
   { to: '/profile', icon: User, label: 'Profile' },

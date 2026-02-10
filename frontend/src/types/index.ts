@@ -9,9 +9,45 @@ export interface User {
   kycStatus: KycStatus;
   createdAt?: string;
   lastLoginAt?: string;
+  balance?: UserBalance | null;
 }
 
 export type KycStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+
+// User Balance types
+export interface UserBalance {
+  balance: string;
+  currency: string;
+}
+
+export type BalanceTransactionType = 'DEPOSIT' | 'WITHDRAWAL' | 'ORDER_PAYMENT' | 'ORDER_REFUND' | 'ADJUSTMENT';
+export type BalanceTransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+export interface BalanceTransaction {
+  id: string;
+  type: BalanceTransactionType;
+  status: BalanceTransactionStatus;
+  amount: string;
+  balanceBefore: string;
+  balanceAfter: string;
+  reference: string | null;
+  orderId: string | null;
+  orderNumber?: string | null;
+  orderType?: OrderType | null;
+  description: string | null;
+  phoneNumber?: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface BalanceWithHistory {
+  balance: UserBalance & { id: string; updatedAt: string };
+  transactions: BalanceTransaction[];
+  pagination: Pagination;
+}
+
+// Payment source for orders
+export type PaymentSource = 'MPESA_STK' | 'MPESA_MANUAL' | 'ACCOUNT_BALANCE';
 
 // Admin types
 export interface Admin {

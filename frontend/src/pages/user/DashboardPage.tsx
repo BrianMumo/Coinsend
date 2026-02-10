@@ -17,6 +17,7 @@ import {
   Plus,
   Clock,
   CheckCircle,
+  Wallet,
 } from 'lucide-react';
 
 const DashboardPage = () => {
@@ -53,6 +54,13 @@ const DashboardPage = () => {
 
   const quickActions = [
     {
+      icon: Wallet,
+      label: 'Top Up',
+      description: 'Add funds to balance',
+      to: '/wallet',
+      color: 'bg-indigo-100 text-indigo-600',
+    },
+    {
       icon: ArrowDownLeft,
       label: 'Sell Crypto',
       description: 'Convert USDT/USDC to KES',
@@ -73,13 +81,6 @@ const DashboardPage = () => {
       to: '/orders/new/cross-border',
       color: 'bg-purple-100 text-purple-600',
     },
-    {
-      icon: TrendingUp,
-      label: 'OTC Trade',
-      description: 'Large volume trades',
-      to: '/orders/new',
-      color: 'bg-orange-100 text-orange-600',
-    },
   ];
 
   return (
@@ -92,6 +93,29 @@ const DashboardPage = () => {
         </h1>
         <p className="text-gray-600">Here is what is happening with your account today.</p>
       </div>
+
+      {/* Balance Card */}
+      <Card className="bg-gradient-to-r from-blue-50 to-primary-50">
+        <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-100 rounded-xl">
+              <Wallet className="h-8 w-8 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Account Balance</p>
+              <p className="text-3xl font-bold text-gray-900">
+                KES {parseFloat(user?.balance?.balance || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
+          <Link to="/wallet">
+            <Button className="flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Manage Wallet
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

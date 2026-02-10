@@ -11,8 +11,10 @@ import { Alert } from '../../components/ui/Alert';
 import { PageTitle } from '../../components/ui/PageTitle';
 import { ordersApi } from '../../api/orders.api';
 import { ratesApi } from '../../api/rates.api';
+import { useAuthStore } from '../../store/authStore';
 import { CRYPTO_CURRENCIES } from '../../utils/constants';
-import { ArrowDown, Calculator } from 'lucide-react';
+import { PaymentSource } from '../../types';
+import { ArrowDown, Calculator, Wallet, Smartphone } from 'lucide-react';
 
 const formSchema = z.object({
   destinationCurrency: z.string().min(1, 'Please select a currency'),
@@ -27,6 +29,7 @@ type FormData = z.infer<typeof formSchema>;
 
 const KesToCryptoPage = () => {
   const navigate = useNavigate();
+  const { user, updateUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [calculation, setCalculation] = useState<{
@@ -35,6 +38,10 @@ const KesToCryptoPage = () => {
     fee: number;
   } | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'balance' | 'mpesa'>('mpesa');
+
+  // Get user's balance
+  const userBalance = parseFloat(user?.balance?.balance || '0');
 
   const {
     register,
@@ -92,17 +99,43 @@ const KesToCryptoPage = () => {
     setError(null);
     setIsLoading(true);
 
+    // Validate balance payment
+    const amount = parseFloat(data.sourceAmount);
+    if (paymentMethod === 'balance' && amount > userBalance) {
+      setError('Insufficient balance. Please top up your wallet or use M-Pesa.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
+      const paymentSource: PaymentSource | undefined =
+        paymentMethod === 'balance' ? 'ACCOUNT_BALANCE' : undefined;
+
       const response = await ordersApi.create({
         orderType: 'KES_TO_CRYPTO',
         sourceCurrency: 'KES',
         destinationCurrency: data.destinationCurrency,
-        sourceAmount: parseFloat(data.sourceAmount),
+        sourceAmount: amount,
         payoutDestination: data.payoutDestination,
+        paymentSource,
       });
 
       if (response.success && response.data) {
-        navigate(`/orders/${response.data.order.id}`);
+        // If paid from balance, update user's balance in store
+        if (paymentMethod === 'balance' && response.data.paidFromBalance) {
+          const newBalance = userBalance - amount;
+          updateUser({
+            balance: {
+              balance: newBalance.toString(),
+              currency: 'KES',
+            },
+          });
+        }
+
+        // Redirect to order detail page
+        // Add query param to indicate if it was paid from balance (for showing success message)
+        const queryParam = response.data.paidFromBalance ? '?paid=true' : '';
+        navigate(`/orders/${response.data.order.id}${queryParam}`);
       }
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Failed to create order');
@@ -184,6 +217,58 @@ const KesToCryptoPage = () => {
               {...register('payoutDestination')}
             />
 
+            {/* Payment Method Selector */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Payment Method</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('balance')}
+                  disabled={userBalance < (parseFloat(sourceAmount) || 0)}
+                  className={`p-4 rounded-lg border-2 transition-all text-left ${
+                    paymentMethod === 'balance'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  } ${
+                    userBalance < (parseFloat(sourceAmount) || 0)
+                      ? 'opacity-50 cursor-not-allowed'
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wallet className="h-5 w-5 text-primary-600" />
+                    <span className="font-medium">Account Balance</span>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    KES {userBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} available
+                  </p>
+                  {userBalance < (parseFloat(sourceAmount) || 0) && parseFloat(sourceAmount) > 0 && (
+                    <p className="text-xs text-red-500 mt-1">Insufficient balance</p>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('mpesa')}
+                  className={`p-4 rounded-lg border-2 transition-all text-left ${
+                    paymentMethod === 'mpesa'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Smartphone className="h-5 w-5 text-green-600" />
+                    <span className="font-medium">M-Pesa</span>
+                  </div>
+                  <p className="text-sm text-gray-500">Pay with STK Push</p>
+                </button>
+              </div>
+              {paymentMethod === 'balance' && (
+                <p className="text-sm text-green-600 flex items-center gap-1">
+                  <span>Instant payment from your balance - no M-Pesa prompt needed!</span>
+                </p>
+              )}
+            </div>
+
             <Button
               type="submit"
               className="w-full"
@@ -191,7 +276,7 @@ const KesToCryptoPage = () => {
               isLoading={isLoading}
               disabled={!calculation}
             >
-              Create Order
+              {paymentMethod === 'balance' ? 'Pay & Create Order' : 'Create Order'}
             </Button>
           </form>
         </CardContent>

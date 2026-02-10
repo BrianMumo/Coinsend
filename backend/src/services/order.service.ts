@@ -2,12 +2,16 @@ import { PrismaClient, OrderType, OrderStatus } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 import { CreateOrderRequest, PaginationParams } from '../types';
 import { rateService } from './rate.service';
+import { balanceService } from './balance.service';
 import { config } from '../config/env';
+import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
+export type PaymentSource = 'MPESA_STK' | 'MPESA_MANUAL' | 'ACCOUNT_BALANCE';
+
 export class OrderService {
-  async createOrder(userId: string, data: CreateOrderRequest) {
+  async createOrder(userId: string, data: CreateOrderRequest & { paymentSource?: PaymentSource }) {
     // Calculate rate and destination amount
     const rateInfo = await rateService.calculateRate({
       sourceCurrency: data.sourceCurrency,
@@ -22,6 +26,20 @@ export class OrderService {
     // Set expiration (24 hours from now)
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
+
+    // If paying with balance, validate balance first
+    if (data.paymentSource === 'ACCOUNT_BALANCE') {
+      // Only allow balance payment for KES_TO_CRYPTO and CROSS_BORDER
+      if (data.orderType !== 'KES_TO_CRYPTO' && data.orderType !== 'CROSS_BORDER') {
+        throw new AppError('Balance payment is only available for KES payments', 400);
+      }
+
+      // Check if user has sufficient balance
+      const userBalance = await balanceService.getOrCreateBalance(userId);
+      if (Number(userBalance.balance) < data.sourceAmount) {
+        throw new AppError('Insufficient balance', 400);
+      }
+    }
 
     // Create order
     const order = await prisma.order.create({
@@ -54,10 +72,61 @@ export class OrderService {
       },
     });
 
+    // If paying with balance, deduct and mark as PAID
+    if (data.paymentSource === 'ACCOUNT_BALANCE') {
+      try {
+        const balanceResult = await balanceService.payFromBalance(
+          userId,
+          order.id,
+          Number(data.sourceAmount)
+        );
+
+        // Update order to PAID status
+        const paidOrder = await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            status: 'PAID',
+            paymentMethod: 'ACCOUNT_BALANCE',
+            paymentReference: balanceResult.transaction.id,
+            paidAt: new Date(),
+          },
+          include: {
+            user: {
+              select: {
+                email: true,
+                phone: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
+
+        logger.info(`Order ${order.orderNumber} paid from balance. New balance: ${balanceResult.newBalance}`);
+
+        return {
+          order: paidOrder,
+          paymentInstructions: {
+            type: 'balance_payment',
+            message: 'Payment successful from your account balance',
+            details: {
+              amount: data.sourceAmount.toString(),
+              newBalance: balanceResult.newBalance.toString(),
+            },
+          },
+          paidFromBalance: true,
+        };
+      } catch (error: any) {
+        // If balance payment fails, delete the order
+        await prisma.order.delete({ where: { id: order.id } });
+        throw error;
+      }
+    }
+
     // Get payment instructions based on order type
     const paymentInstructions = await this.getPaymentInstructions(order);
 
-    return { order, paymentInstructions };
+    return { order, paymentInstructions, paidFromBalance: false };
   }
 
   async getOrderById(orderId: string, userId?: string) {
@@ -181,6 +250,22 @@ export class OrderService {
 
     if (!['PENDING', 'PAID'].includes(order.status)) {
       throw new AppError(`Cannot cancel order with status: ${order.status}`, 400);
+    }
+
+    // If order was paid from balance, refund it
+    if (order.paymentMethod === 'ACCOUNT_BALANCE' && order.status === 'PAID') {
+      try {
+        await balanceService.refundToBalance(
+          userId,
+          orderId,
+          Number(order.sourceAmount),
+          `Refund for cancelled order ${order.orderNumber}`
+        );
+        logger.info(`Refunded ${order.sourceAmount} to user ${userId} for cancelled order ${order.orderNumber}`);
+      } catch (error: any) {
+        logger.error(`Failed to refund balance for order ${orderId}: ${error.message}`);
+        // Continue with cancellation even if refund fails (can be handled manually)
+      }
     }
 
     const updatedOrder = await prisma.order.update({

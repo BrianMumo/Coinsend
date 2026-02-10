@@ -256,7 +256,46 @@ class MpesaService {
 
     logger.info(`M-Pesa Callback received - CheckoutRequestID: ${CheckoutRequestID}, ResultCode: ${ResultCode}`);
 
-    // Find the order by CheckoutRequestID (stored in paymentReference)
+    // Extract metadata
+    let mpesaReceiptNumber = '';
+    let transactionDate = '';
+    let phoneNumber = '';
+
+    if (CallbackMetadata?.Item) {
+      for (const item of CallbackMetadata.Item) {
+        if (item.Name === 'MpesaReceiptNumber') {
+          mpesaReceiptNumber = String(item.Value);
+        } else if (item.Name === 'TransactionDate') {
+          transactionDate = String(item.Value);
+        } else if (item.Name === 'PhoneNumber') {
+          phoneNumber = String(item.Value);
+        }
+      }
+    }
+
+    // First, check if this is a balance deposit transaction
+    const depositTransaction = await prisma.balanceTransaction.findFirst({
+      where: {
+        reference: CheckoutRequestID,
+        type: 'DEPOSIT',
+        status: 'PENDING',
+      },
+    });
+
+    if (depositTransaction) {
+      // This is a balance deposit - delegate to balance service
+      // Import dynamically to avoid circular dependency
+      const { balanceService } = await import('./balance.service');
+      await balanceService.processDepositCallback(
+        CheckoutRequestID,
+        ResultCode === 0,
+        mpesaReceiptNumber || undefined
+      );
+      logger.info(`Processed deposit callback for transaction ${depositTransaction.id}`);
+      return;
+    }
+
+    // Otherwise, find the order by CheckoutRequestID (stored in paymentReference)
     const order = await prisma.order.findFirst({
       where: {
         paymentReference: CheckoutRequestID,
@@ -264,29 +303,12 @@ class MpesaService {
     });
 
     if (!order) {
-      logger.warn(`No order found for CheckoutRequestID: ${CheckoutRequestID}`);
+      logger.warn(`No order or deposit found for CheckoutRequestID: ${CheckoutRequestID}`);
       return;
     }
 
     if (ResultCode === 0) {
-      // Payment successful
-      let mpesaReceiptNumber = '';
-      let transactionDate = '';
-      let phoneNumber = '';
-
-      if (CallbackMetadata?.Item) {
-        for (const item of CallbackMetadata.Item) {
-          if (item.Name === 'MpesaReceiptNumber') {
-            mpesaReceiptNumber = String(item.Value);
-          } else if (item.Name === 'TransactionDate') {
-            transactionDate = String(item.Value);
-          } else if (item.Name === 'PhoneNumber') {
-            phoneNumber = String(item.Value);
-          }
-        }
-      }
-
-      // Update order to PAID status
+      // Payment successful - Update order to PAID status
       await prisma.order.update({
         where: { id: order.id },
         data: {

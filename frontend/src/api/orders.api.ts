@@ -1,5 +1,5 @@
 import api from './client';
-import { ApiResponse, Order, OrderType, OrderStatus, PaymentInstructions, Pagination } from '../types';
+import { ApiResponse, Order, OrderType, OrderStatus, PaymentInstructions, Pagination, PaymentSource } from '../types';
 
 export interface CreateOrderData {
   orderType: OrderType;
@@ -11,6 +11,7 @@ export interface CreateOrderData {
   recipientPhone?: string;
   recipientBank?: string;
   recipientAccount?: string;
+  paymentSource?: PaymentSource;
 }
 
 export interface OrderListParams {
@@ -23,7 +24,7 @@ export interface OrderListParams {
 }
 
 export const ordersApi = {
-  create: async (data: CreateOrderData): Promise<ApiResponse<{ order: Order; paymentInstructions: PaymentInstructions }>> => {
+  create: async (data: CreateOrderData): Promise<ApiResponse<{ order: Order; paymentInstructions: PaymentInstructions; paidFromBalance?: boolean }>> => {
     const response = await api.post('/orders', data);
     return response.data;
   },
