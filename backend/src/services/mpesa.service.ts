@@ -737,7 +737,7 @@ class MpesaService {
       TransactionID: transactionId,
       Amount: Math.round(amount),
       ReceiverParty: config.mpesa.shortcode,
-      RecieverIdentifierType: '4', // 4 = Organization shortcode
+      RecieverIdentifierType: 11, // 11 = Organization shortcode identifier
       ResultURL: `${config.mpesa.resultUrl}/reversal/result`,
       QueueTimeOutURL: `${config.mpesa.timeoutUrl}/reversal/timeout`,
       Remarks: remarks,
