@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 // TronWeb doesn't have proper TypeScript types
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const TronWebModule = require('tronweb');
-const TronWeb = TronWebModule.default ? TronWebModule.default : TronWebModule;
+const TronWeb = TronWebModule.TronWeb || TronWebModule.default || TronWebModule;
 
 const prisma = new PrismaClient();
 
