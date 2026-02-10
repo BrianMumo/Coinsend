@@ -205,3 +205,44 @@ export const adminMpesaApi = {
     return response.data;
   },
 };
+
+// Balance Transactions Admin API (for reconciliation)
+export interface PendingBalanceTransaction {
+  id: string;
+  type: 'DEPOSIT' | 'WITHDRAWAL' | 'ORDER_PAYMENT' | 'ORDER_REFUND' | 'ADJUSTMENT';
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  amount: string;
+  balanceBefore: string;
+  balanceAfter: string;
+  reference: string | null;
+  phoneNumber: string | null;
+  description: string | null;
+  createdAt: string;
+  userBalance: {
+    user: {
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+      phone: string | null;
+    };
+  };
+}
+
+export const adminBalanceApi = {
+  // Get pending balance transactions
+  getPendingTransactions: async (): Promise<ApiResponse<{ transactions: PendingBalanceTransaction[] }>> => {
+    const response = await adminApi.get('/admin/balance/transactions/pending');
+    return response.data;
+  },
+
+  // Complete a pending balance transaction
+  completeTransaction: async (
+    id: string,
+    mpesaReceiptNumber?: string
+  ): Promise<ApiResponse<{ transaction: PendingBalanceTransaction }>> => {
+    const response = await adminApi.post(`/admin/balance/transactions/${id}/complete`, {
+      mpesaReceiptNumber,
+    });
+    return response.data;
+  },
+};

@@ -7,7 +7,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
 import { Badge } from '../../components/ui/Badge';
 import { PageTitle } from '../../components/ui/PageTitle';
-import { adminMpesaApi } from '../../api/admin.api';
+import { adminMpesaApi, adminBalanceApi, PendingBalanceTransaction } from '../../api/admin.api';
 import { MpesaTransaction, MpesaBalance } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { useAdminAuthStore } from '../../store/adminAuthStore';
@@ -22,6 +22,8 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from 'lucide-react';
 
 const AdminMpesaPage = () => {
@@ -51,6 +53,11 @@ const AdminMpesaPage = () => {
   });
   const [isSubmittingB2C, setIsSubmittingB2C] = useState(false);
 
+  // Pending balance transactions state
+  const [pendingBalanceTx, setPendingBalanceTx] = useState<PendingBalanceTransaction[]>([]);
+  const [isLoadingPendingTx, setIsLoadingPendingTx] = useState(true);
+  const [completingTxId, setCompletingTxId] = useState<string | null>(null);
+
   // Messages
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -66,6 +73,42 @@ const AdminMpesaPage = () => {
       console.error('Failed to fetch balance:', err);
     } finally {
       setIsLoadingBalance(false);
+    }
+  };
+
+  // Fetch pending balance transactions
+  const fetchPendingBalanceTx = async () => {
+    try {
+      setIsLoadingPendingTx(true);
+      const response = await adminBalanceApi.getPendingTransactions();
+      if (response.success && response.data) {
+        setPendingBalanceTx(response.data.transactions);
+      }
+    } catch (err) {
+      console.error('Failed to fetch pending balance transactions:', err);
+    } finally {
+      setIsLoadingPendingTx(false);
+    }
+  };
+
+  // Complete a pending balance transaction
+  const handleCompleteTransaction = async (txId: string) => {
+    if (!confirm('Are you sure you want to mark this transaction as completed?')) return;
+
+    setCompletingTxId(txId);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await adminBalanceApi.completeTransaction(txId);
+      if (response.success) {
+        setSuccess('Transaction marked as completed');
+        fetchPendingBalanceTx();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Failed to complete transaction');
+    } finally {
+      setCompletingTxId(null);
     }
   };
 
@@ -146,6 +189,7 @@ const AdminMpesaPage = () => {
   useEffect(() => {
     fetchBalance();
     fetchTransactions();
+    fetchPendingBalanceTx();
   }, []);
 
   useEffect(() => {
@@ -354,6 +398,86 @@ const AdminMpesaPage = () => {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending Balance Transactions */}
+      {pendingBalanceTx.length > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-yellow-800">
+              <AlertTriangle className="h-5 w-5" />
+              Pending Balance Transactions ({pendingBalanceTx.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-yellow-700 mb-4">
+              These transactions need manual reconciliation. Verify payment was received before marking as complete.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-yellow-100">
+                    <th className="text-left py-3 px-4 font-medium">Date</th>
+                    <th className="text-left py-3 px-4 font-medium">Type</th>
+                    <th className="text-left py-3 px-4 font-medium">User</th>
+                    <th className="text-left py-3 px-4 font-medium">Phone</th>
+                    <th className="text-right py-3 px-4 font-medium">Amount</th>
+                    <th className="text-left py-3 px-4 font-medium">Reference</th>
+                    <th className="text-left py-3 px-4 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingBalanceTx.map((tx) => (
+                    <tr key={tx.id} className="border-b hover:bg-yellow-100">
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        {formatDate(tx.createdAt)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge
+                          variant={tx.type === 'DEPOSIT' ? 'success' : tx.type === 'WITHDRAWAL' ? 'error' : 'default'}
+                          className="flex items-center gap-1 w-fit"
+                        >
+                          {tx.type === 'DEPOSIT' ? (
+                            <ArrowDownLeft className="h-3 w-3" />
+                          ) : (
+                            <ArrowUpRight className="h-3 w-3" />
+                          )}
+                          {tx.type}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div>{tx.userBalance.user.email}</div>
+                        <div className="text-xs text-gray-500">
+                          {tx.userBalance.user.firstName} {tx.userBalance.user.lastName}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {tx.phoneNumber || tx.userBalance.user.phone || '-'}
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium">
+                        {formatCurrency(Math.abs(parseFloat(tx.amount)), 'KES')}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-xs max-w-[200px] truncate">
+                        {tx.reference || '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Button
+                          size="sm"
+                          onClick={() => handleCompleteTransaction(tx.id)}
+                          isLoading={completingTxId === tx.id}
+                          disabled={completingTxId !== null}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Complete
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
