@@ -754,6 +754,7 @@ class MpesaService {
 
     try {
       logger.info(`Initiating reversal for transaction ${transactionId}, Amount: ${amount}`);
+      logger.info(`Using reversal initiator: ${reversalInitiator} (reversal-specific: ${!!config.mpesa.reversalInitiatorName})`);
 
       const response = await axios.post(
         `${this.baseUrl}/mpesa/reversal/v1/request`,
