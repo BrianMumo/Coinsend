@@ -396,7 +396,7 @@ export class AdminService {
   private validateStatusTransition(currentStatus: OrderStatus, newStatus: OrderStatus) {
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
       PENDING: ['PAID', 'CANCELLED', 'EXPIRED'],
-      PAID: ['PROCESSING', 'CANCELLED', 'FAILED'],
+      PAID: ['PROCESSING', 'COMPLETED', 'CANCELLED', 'FAILED'],
       PROCESSING: ['COMPLETED', 'FAILED'],
       COMPLETED: [],
       FAILED: [],
