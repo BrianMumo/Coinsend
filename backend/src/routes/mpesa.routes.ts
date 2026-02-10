@@ -188,6 +188,41 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     logger.info('B2C Result Callback received:', JSON.stringify(req.body));
 
+    const { Result } = req.body;
+    const { ResultCode, OriginatorConversationID, TransactionID, ResultParameters } = Result || {};
+
+    // Extract M-Pesa receipt number from result parameters
+    let mpesaReceiptNumber = TransactionID;
+    if (ResultCode === 0 && ResultParameters?.ResultParameter) {
+      for (const param of ResultParameters.ResultParameter) {
+        if (param.Key === 'TransactionReceipt') {
+          mpesaReceiptNumber = String(param.Value);
+          break;
+        }
+      }
+    }
+
+    // Check if this is a balance withdrawal
+    const withdrawalTx = await prisma.balanceTransaction.findFirst({
+      where: {
+        reference: OriginatorConversationID,
+        type: 'WITHDRAWAL',
+        status: 'PENDING',
+      },
+    });
+
+    if (withdrawalTx) {
+      // This is a balance withdrawal - delegate to balance service
+      const { balanceService } = await import('../services/balance.service');
+      await balanceService.processWithdrawalCallback(
+        OriginatorConversationID,
+        ResultCode === 0,
+        mpesaReceiptNumber
+      );
+      logger.info(`Processed withdrawal callback for transaction ${withdrawalTx.id}`);
+    }
+
+    // Also process in MpesaTransaction table for audit trail
     await mpesaService.processB2CCallback(req.body);
 
     res.json({
@@ -209,6 +244,26 @@ router.post(
     const { OriginatorConversationID } = req.body.Result || {};
 
     if (OriginatorConversationID) {
+      // Check if this is a balance withdrawal
+      const withdrawalTx = await prisma.balanceTransaction.findFirst({
+        where: {
+          reference: OriginatorConversationID,
+          type: 'WITHDRAWAL',
+          status: 'PENDING',
+        },
+      });
+
+      if (withdrawalTx) {
+        // This is a balance withdrawal - mark as failed and refund
+        const { balanceService } = await import('../services/balance.service');
+        await balanceService.processWithdrawalCallback(
+          OriginatorConversationID,
+          false // failed
+        );
+        logger.info(`Processed withdrawal timeout for transaction ${withdrawalTx.id}`);
+      }
+
+      // Update MpesaTransaction table
       await prisma.mpesaTransaction.updateMany({
         where: { originatorConversationId: OriginatorConversationID },
         data: {
