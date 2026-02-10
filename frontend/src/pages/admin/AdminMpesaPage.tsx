@@ -403,7 +403,7 @@ const AdminMpesaPage = () => {
       )}
 
       {/* Pending Balance Transactions */}
-      {pendingBalanceTx.length > 0 && (
+      {(isLoadingPendingTx || pendingBalanceTx.length > 0) && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-yellow-800">
@@ -412,6 +412,12 @@ const AdminMpesaPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {isLoadingPendingTx ? (
+              <div className="flex justify-center py-4">
+                <Spinner />
+              </div>
+            ) : (
+            <>
             <p className="text-sm text-yellow-700 mb-4">
               These transactions need manual reconciliation. Verify payment was received before marking as complete.
             </p>
@@ -478,6 +484,8 @@ const AdminMpesaPage = () => {
                 </tbody>
               </table>
             </div>
+            </>
+            )}
           </CardContent>
         </Card>
       )}
