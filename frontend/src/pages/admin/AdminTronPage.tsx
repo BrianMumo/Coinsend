@@ -185,8 +185,8 @@ const AdminTronPage = () => {
   };
 
   // Get type badge variant
-  const getTypeVariant = (type: string) => {
-    return type === 'DEPOSIT' ? 'success' : 'info';
+  const getTypeVariant = (type: string): 'success' | 'warning' => {
+    return type === 'DEPOSIT' ? 'success' : 'warning';
   };
 
   // Format USDT amount
@@ -203,8 +203,8 @@ const AdminTronPage = () => {
       </div>
 
       {/* Messages */}
-      {error && <Alert variant="error" onClose={() => setError(null)}>{error}</Alert>}
-      {success && <Alert variant="success" onClose={() => setSuccess(null)}>{success}</Alert>}
+      {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+      {success && <Alert variant="success" className="mb-4">{success}</Alert>}
 
       {/* Wallet Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
