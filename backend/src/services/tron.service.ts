@@ -1,8 +1,11 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const TronWeb = require('tronweb');
 import { config } from '../config/env';
 import { logger } from '../utils/logger';
 import { PrismaClient } from '@prisma/client';
+
+// TronWeb doesn't have proper TypeScript types
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const TronWebModule = require('tronweb');
+const TronWeb = TronWebModule.default ? TronWebModule.default : TronWebModule;
 
 const prisma = new PrismaClient();
 
