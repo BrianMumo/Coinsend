@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon",
-    "build": "prisma generate && prisma db push && tsc",
-    "start": "node dist/index.js",
+    "build": "prisma generate && tsc",
+    "start": "prisma db push && node dist/index.js",
     "postinstall": "prisma generate",
     "db:deploy": "prisma db push",
     "db:generate": "prisma generate",
