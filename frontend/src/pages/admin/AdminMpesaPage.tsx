@@ -7,6 +7,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
 import { Badge } from '../../components/ui/Badge';
 import { PageTitle } from '../../components/ui/PageTitle';
+import { ConfirmModal } from '../../components/ui/Modal';
 import { adminMpesaApi, adminBalanceApi, PendingBalanceTransaction } from '../../api/admin.api';
 import { MpesaTransaction, MpesaBalance } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -61,6 +62,10 @@ const AdminMpesaPage = () => {
 
   // Reversal state
   const [reversingTxId, setReversingTxId] = useState<string | null>(null);
+  const [reversalModalTx, setReversalModalTx] = useState<MpesaTransaction | null>(null);
+
+  // Complete transaction modal state
+  const [completeModalTxId, setCompleteModalTxId] = useState<string | null>(null);
 
   // Messages
   const [error, setError] = useState<string | null>(null);
@@ -96,15 +101,16 @@ const AdminMpesaPage = () => {
   };
 
   // Complete a pending balance transaction
-  const handleCompleteTransaction = async (txId: string) => {
-    if (!confirm('Are you sure you want to mark this transaction as completed?')) return;
+  const handleCompleteTransaction = async () => {
+    if (!completeModalTxId) return;
 
-    setCompletingTxId(txId);
+    setCompletingTxId(completeModalTxId);
+    setCompleteModalTxId(null);
     setError(null);
     setSuccess(null);
 
     try {
-      const response = await adminBalanceApi.completeTransaction(txId);
+      const response = await adminBalanceApi.completeTransaction(completeModalTxId);
       if (response.success) {
         setSuccess('Transaction marked as completed');
         fetchPendingBalanceTx();
@@ -191,11 +197,11 @@ const AdminMpesaPage = () => {
   };
 
   // Handle transaction reversal
-  const handleReversal = async (tx: MpesaTransaction) => {
-    const confirmMessage = `Are you sure you want to reverse this B2C payment?\n\nAmount: KES ${parseFloat(tx.amount).toLocaleString()}\nPhone: ${tx.phoneNumber}\nReceipt: ${tx.mpesaReceiptNumber}\n\nThis action cannot be undone.`;
+  const handleReversal = async () => {
+    if (!reversalModalTx) return;
 
-    if (!confirm(confirmMessage)) return;
-
+    const tx = reversalModalTx;
+    setReversalModalTx(null);
     setReversingTxId(tx.id);
     setError(null);
     setSuccess(null);
@@ -528,7 +534,7 @@ const AdminMpesaPage = () => {
                       <td className="py-3 px-4">
                         <Button
                           size="sm"
-                          onClick={() => handleCompleteTransaction(tx.id)}
+                          onClick={() => setCompleteModalTxId(tx.id)}
                           isLoading={completingTxId === tx.id}
                           disabled={completingTxId !== null}
                         >
@@ -645,7 +651,7 @@ const AdminMpesaPage = () => {
                               size="sm"
                               variant="outline"
                               className="text-red-600 border-red-300 hover:bg-red-50"
-                              onClick={() => handleReversal(tx)}
+                              onClick={() => setReversalModalTx(tx)}
                               isLoading={reversingTxId === tx.id}
                               disabled={reversingTxId !== null}
                             >
@@ -694,6 +700,68 @@ const AdminMpesaPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Reversal Confirmation Modal */}
+      <ConfirmModal
+        isOpen={reversalModalTx !== null}
+        onClose={() => setReversalModalTx(null)}
+        onConfirm={handleReversal}
+        title="Reverse B2C Payment"
+        variant="danger"
+        confirmText="Reverse Payment"
+        cancelText="Cancel"
+        isLoading={reversingTxId !== null}
+        message={
+          reversalModalTx && (
+            <div className="text-left space-y-3">
+              <p>Are you sure you want to reverse this B2C payment?</p>
+              <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Amount:</span>
+                  <span className="font-semibold">KES {parseFloat(reversalModalTx.amount).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Phone:</span>
+                  <span className="font-mono">{reversalModalTx.phoneNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Receipt:</span>
+                  <span className="font-mono text-xs">{reversalModalTx.mpesaReceiptNumber}</span>
+                </div>
+                {reversalModalTx.receiverPartyPublicName && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Recipient:</span>
+                    <span>{reversalModalTx.receiverPartyPublicName}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-red-600 text-xs font-medium">
+                This action cannot be undone.
+              </p>
+            </div>
+          )
+        }
+      />
+
+      {/* Complete Transaction Confirmation Modal */}
+      <ConfirmModal
+        isOpen={completeModalTxId !== null}
+        onClose={() => setCompleteModalTxId(null)}
+        onConfirm={handleCompleteTransaction}
+        title="Complete Transaction"
+        variant="warning"
+        confirmText="Mark as Complete"
+        cancelText="Cancel"
+        isLoading={completingTxId !== null}
+        message={
+          <div className="text-left">
+            <p>Are you sure you want to mark this transaction as completed?</p>
+            <p className="mt-2 text-yellow-700 text-xs">
+              Please verify that the payment was received before completing.
+            </p>
+          </div>
+        }
+      />
     </div>
   );
 };
