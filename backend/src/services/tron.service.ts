@@ -1,4 +1,5 @@
-import TronWeb from 'tronweb';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const TronWeb = require('tronweb');
 import { config } from '../config/env';
 import { logger } from '../utils/logger';
 import { PrismaClient } from '@prisma/client';
@@ -23,7 +24,7 @@ interface TransferEvent {
 }
 
 class TronService {
-  private tronWeb: TronWeb | null = null;
+  private tronWeb: any = null;
   private usdtContract: string;
 
   constructor() {
@@ -33,7 +34,7 @@ class TronService {
   /**
    * Initialize TronWeb instance
    */
-  private getTronWeb(): TronWeb {
+  private getTronWeb(): any {
     if (!this.tronWeb) {
       if (!config.tron.apiKey) {
         throw new Error('TRON_API_KEY is not configured');
