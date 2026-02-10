@@ -431,4 +431,104 @@ router.get(
   })
 );
 
+// ============ BALANCE TRANSACTION MANAGEMENT ============
+
+// Get pending balance transactions (for reconciliation)
+router.get(
+  '/balance/transactions/pending',
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const transactions = await prisma.balanceTransaction.findMany({
+      where: { status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        userBalance: {
+          include: {
+            user: {
+              select: { email: true, firstName: true, lastName: true, phone: true },
+            },
+          },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: { transactions },
+    });
+  })
+);
+
+// Manually complete a balance transaction (for reconciliation)
+router.post(
+  '/balance/transactions/:id/complete',
+  requireRole(['SUPER_ADMIN', 'ADMIN']),
+  validate([
+    body('mpesaReceiptNumber').optional().trim(),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { id } = req.params;
+    const { mpesaReceiptNumber } = req.body;
+
+    const transaction = await prisma.balanceTransaction.findUnique({
+      where: { id },
+      include: { userBalance: true },
+    });
+
+    if (!transaction) {
+      throw new AppError('Transaction not found', 404);
+    }
+
+    if (transaction.status !== 'PENDING') {
+      throw new AppError(`Transaction is already ${transaction.status}`, 400);
+    }
+
+    if (transaction.type === 'DEPOSIT') {
+      // For deposits, add to balance
+      const depositAmount = Number(transaction.amount);
+      const currentBalance = Number(transaction.userBalance.balance);
+      const newBalance = currentBalance + depositAmount;
+
+      await prisma.$transaction([
+        prisma.userBalance.update({
+          where: { id: transaction.userBalanceId },
+          data: { balance: newBalance },
+        }),
+        prisma.balanceTransaction.update({
+          where: { id },
+          data: {
+            status: 'COMPLETED',
+            balanceAfter: newBalance,
+            reference: mpesaReceiptNumber || transaction.reference,
+            description: `Manually completed by admin. Receipt: ${mpesaReceiptNumber || 'N/A'}`,
+            completedAt: new Date(),
+          },
+        }),
+      ]);
+    } else if (transaction.type === 'WITHDRAWAL') {
+      // For withdrawals, just mark as completed (balance already deducted)
+      await prisma.balanceTransaction.update({
+        where: { id },
+        data: {
+          status: 'COMPLETED',
+          reference: mpesaReceiptNumber || transaction.reference,
+          description: `Withdrawal completed. Receipt: ${mpesaReceiptNumber || 'N/A'}`,
+          completedAt: new Date(),
+        },
+      });
+    } else {
+      throw new AppError('Can only manually complete DEPOSIT or WITHDRAWAL transactions', 400);
+    }
+
+    const updatedTransaction = await prisma.balanceTransaction.findUnique({
+      where: { id },
+    });
+
+    res.json({
+      success: true,
+      message: `Transaction marked as completed`,
+      data: { transaction: updatedTransaction },
+    });
+  })
+);
+
 export default router;
