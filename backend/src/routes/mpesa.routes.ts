@@ -17,11 +17,10 @@ const prisma = new PrismaClient();
 router.post(
   '/stkpush',
   authenticate,
-  [
+  validate([
     body('orderId').notEmpty().withMessage('Order ID is required'),
     body('phoneNumber').notEmpty().withMessage('Phone number is required'),
-  ],
-  validate,
+  ]),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     logger.info('=== STK PUSH REQUEST RECEIVED ===');
     logger.info(`Body: ${JSON.stringify(req.body)}`);
