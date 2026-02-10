@@ -461,7 +461,7 @@ router.get(
 // Manually complete a balance transaction (for reconciliation)
 router.post(
   '/balance/transactions/:id/complete',
-  requireRole(['SUPER_ADMIN', 'ADMIN']),
+  requireRole('SUPER_ADMIN', 'ADMIN'),
   validate([
     body('mpesaReceiptNumber').optional().trim(),
   ]),
