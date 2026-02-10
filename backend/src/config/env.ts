@@ -21,6 +21,9 @@ export const config = {
     securityCredential: process.env.MPESA_SECURITY_CREDENTIAL || '',
     resultUrl: process.env.MPESA_RESULT_URL || '',
     timeoutUrl: process.env.MPESA_TIMEOUT_URL || '',
+    // Reversal Configuration (separate API operator)
+    reversalInitiatorName: process.env.MPESA_REVERSAL_INITIATOR_NAME || '',
+    reversalSecurityCredential: process.env.MPESA_REVERSAL_SECURITY_CREDENTIAL || '',
   },
 
   jwt: {

@@ -730,9 +730,17 @@ class MpesaService {
       throw new Error('Original transaction not found or already reversed');
     }
 
+    // Use separate reversal credentials (different API operator with reversal permissions)
+    const reversalInitiator = config.mpesa.reversalInitiatorName || config.mpesa.initiatorName;
+    const reversalCredential = config.mpesa.reversalSecurityCredential || config.mpesa.securityCredential;
+
+    if (!reversalInitiator || !reversalCredential) {
+      throw new Error('Reversal credentials not configured. Set MPESA_REVERSAL_INITIATOR_NAME and MPESA_REVERSAL_SECURITY_CREDENTIAL');
+    }
+
     const payload = {
-      Initiator: config.mpesa.initiatorName,
-      SecurityCredential: config.mpesa.securityCredential,
+      Initiator: reversalInitiator,
+      SecurityCredential: reversalCredential,
       CommandID: 'TransactionReversal',
       TransactionID: transactionId,
       Amount: Math.round(amount),
