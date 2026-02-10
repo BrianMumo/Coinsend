@@ -134,7 +134,7 @@ const AdminDashboardPage = () => {
                 </p>
               </div>
               <Link
-                to="/admin/orders?status=PAID"
+                to="/mumo/orders?status=PAID"
                 className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
               >
                 View Orders
@@ -148,7 +148,7 @@ const AdminDashboardPage = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Orders</CardTitle>
-          <Link to="/admin/orders" className="text-sm text-primary-600 hover:text-primary-700">
+          <Link to="/mumo/orders" className="text-sm text-primary-600 hover:text-primary-700">
             View All
           </Link>
         </CardHeader>
@@ -170,7 +170,7 @@ const AdminDashboardPage = () => {
                   <tr key={order.id} className="text-sm">
                     <td className="py-3">
                       <Link
-                        to={`/admin/orders?search=${order.orderNumber}`}
+                        to={`/mumo/orders?search=${order.orderNumber}`}
                         className="font-medium text-primary-600 hover:text-primary-700"
                       >
                         {order.orderNumber}
