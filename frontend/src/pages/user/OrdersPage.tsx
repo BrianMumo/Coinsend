@@ -1,27 +1,25 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge, getStatusVariant } from '../../components/ui/Badge';
-import { Select } from '../../components/ui/Select';
 import { Spinner } from '../../components/ui/Spinner';
-import { PageTitle } from '../../components/ui/PageTitle';
 import { ordersApi } from '../../api/orders.api';
-import { Order, OrderStatus } from '../../types';
-import { formatCurrency, formatDate, formatOrderType, formatStatus } from '../../utils/formatters';
-import { ORDER_STATUSES } from '../../utils/constants';
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Order } from '../../types';
+import { formatCurrency, formatDate, formatStatus } from '../../utils/formatters';
+import { Plus, ChevronRight, Package } from 'lucide-react';
+
+type FilterType = 'all' | 'active' | 'completed';
 
 const OrdersPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 20,
     total: 0,
     totalPages: 0,
   });
-  const [statusFilter, setStatusFilter] = useState<string>('');
 
   const fetchOrders = async (page: number = 1) => {
     setIsLoading(true);
@@ -29,7 +27,6 @@ const OrdersPage = () => {
       const response = await ordersApi.getAll({
         page,
         limit: pagination.limit,
-        status: statusFilter as OrderStatus || undefined,
         sortBy: 'createdAt',
         sortOrder: 'desc',
       });
@@ -49,153 +46,142 @@ const OrdersPage = () => {
 
   useEffect(() => {
     fetchOrders(1);
-  }, [statusFilter]);
+  }, []);
 
-  const handlePageChange = (newPage: number) => {
-    fetchOrders(newPage);
+  // Filter orders based on active filter
+  const filteredOrders = orders.filter((order) => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'active') {
+      return ['PENDING', 'PAID', 'PROCESSING'].includes(order.status);
+    }
+    if (activeFilter === 'completed') {
+      return ['COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED'].includes(order.status);
+    }
+    return true;
+  });
+
+  const getOrderTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      CRYPTO_TO_KES: 'Sell Crypto',
+      KES_TO_CRYPTO: 'Buy Crypto',
+      CROSS_BORDER: 'Cross-border',
+      OTC: 'OTC Trade',
+    };
+    return labels[type] || type;
   };
 
-  const statusOptions = [
-    { value: '', label: 'All Statuses' },
-    ...Object.entries(ORDER_STATUSES).map(([value, { label }]) => ({
-      value,
-      label,
-    })),
-  ];
-
   return (
-    <div className="space-y-6">
-      <PageTitle title="My Orders" description="View and track all your orders on Coinsend." />
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Orders</h1>
-          <p className="text-gray-600">View and track all your orders</p>
-        </div>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-gray-900">My Orders</h1>
         <Link to="/orders/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Order
+          <Button size="sm" className="bg-green-600 hover:bg-green-700">
+            <Plus className="h-4 w-4 mr-1" />
+            New
           </Button>
         </Link>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="flex items-center gap-4">
-            <div className="w-48">
-              <Select
-                options={statusOptions}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                placeholder="Filter by status"
-              />
-            </div>
-            <span className="text-sm text-gray-500">
-              {pagination.total} order{pagination.total !== 1 ? 's' : ''} found
-            </span>
+      {/* Filter Tabs */}
+      <div className="bg-white rounded-xl overflow-hidden">
+        <div className="flex border-b border-gray-100">
+          {[
+            { key: 'all', label: 'All' },
+            { key: 'active', label: 'Active' },
+            { key: 'completed', label: 'History' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveFilter(tab.key as FilterType)}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeFilter === tab.key
+                  ? 'text-green-600 border-b-2 border-green-600 bg-green-50/50'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Orders List */}
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Spinner size="lg" />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Orders Table */}
-      <Card>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Spinner size="lg" />
+        ) : filteredOrders.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-14 h-14 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+              <Package className="w-7 h-7 text-gray-300" />
             </div>
-          ) : orders.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">No orders found</p>
-              <Link to="/orders/new">
-                <Button>Create Your First Order</Button>
-              </Link>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left text-sm text-gray-500 border-b">
-                      <th className="pb-3 font-medium">Order #</th>
-                      <th className="pb-3 font-medium">Type</th>
-                      <th className="pb-3 font-medium">You Send</th>
-                      <th className="pb-3 font-medium">You Receive</th>
-                      <th className="pb-3 font-medium">Status</th>
-                      <th className="pb-3 font-medium">Date</th>
-                      <th className="pb-3 font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {orders.map((order) => (
-                      <tr key={order.id} className="text-sm">
-                        <td className="py-4">
-                          <Link
-                            to={`/orders/${order.id}`}
-                            className="font-medium text-primary-600 hover:text-primary-700"
-                          >
-                            {order.orderNumber}
-                          </Link>
-                        </td>
-                        <td className="py-4">{formatOrderType(order.orderType)}</td>
-                        <td className="py-4">
-                          {formatCurrency(order.sourceAmount, order.sourceCurrency)}
-                        </td>
-                        <td className="py-4">
-                          {formatCurrency(order.destinationAmount, order.destinationCurrency)}
-                        </td>
-                        <td className="py-4">
-                          <Badge variant={getStatusVariant(order.status)}>
-                            {formatStatus(order.status)}
-                          </Badge>
-                        </td>
-                        <td className="py-4 text-gray-500">{formatDate(order.createdAt)}</td>
-                        <td className="py-4">
-                          <Link to={`/orders/${order.id}`}>
-                            <Button variant="ghost" size="sm">
-                              View
-                            </Button>
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination */}
-              {pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <p className="text-sm text-gray-500">
-                    Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
-                    {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-                    {pagination.total} results
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(pagination.page - 1)}
-                      disabled={pagination.page === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(pagination.page + 1)}
-                      disabled={pagination.page === pagination.totalPages}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+            <p className="text-gray-500 text-sm mb-3">
+              {activeFilter === 'all' ? 'No orders yet' : `No ${activeFilter} orders`}
+            </p>
+            <Link to="/orders/new">
+              <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                Create Order
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {filteredOrders.map((order) => (
+              <Link
+                key={order.id}
+                to={`/orders/${order.id}`}
+                className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-900">
+                      {getOrderTypeLabel(order.orderType)}
+                    </span>
+                    <Badge variant={getStatusVariant(order.status)} className="text-[10px]">
+                      {formatStatus(order.status)}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>{order.orderNumber}</span>
+                    <span>•</span>
+                    <span>{formatDate(order.createdAt)}</span>
+                  </div>
+                  <div className="mt-1 text-sm">
+                    <span className="text-gray-600">
+                      {formatCurrency(order.sourceAmount, order.sourceCurrency)}
+                    </span>
+                    <span className="text-gray-400 mx-1">→</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(order.destinationAmount, order.destinationCurrency)}
+                    </span>
                   </div>
                 </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+                <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Load More */}
+        {pagination.totalPages > 1 && pagination.page < pagination.totalPages && (
+          <div className="p-4 border-t border-gray-100">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => fetchOrders(pagination.page + 1)}
+            >
+              Load More
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Summary */}
+      {orders.length > 0 && (
+        <p className="text-center text-xs text-gray-500">
+          Showing {filteredOrders.length} of {pagination.total} orders
+        </p>
+      )}
     </div>
   );
 };

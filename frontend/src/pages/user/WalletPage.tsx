@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
@@ -22,6 +21,8 @@ import {
   EyeOff,
 } from 'lucide-react';
 
+type TabType = 'all' | 'deposits' | 'withdrawals';
+
 const WalletPage = () => {
   const location = useLocation();
   const { user, updateUser } = useAuthStore();
@@ -30,6 +31,7 @@ const WalletPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [showBalance, setShowBalance] = useState(true);
   const [usdtRate, setUsdtRate] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<TabType>('all');
 
   // Modal states
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -60,7 +62,7 @@ const WalletPage = () => {
     try {
       setIsLoading(true);
       const [balanceResponse, usdtResponse, ratesResponse] = await Promise.all([
-        balanceApi.getBalance({ limit: 20 }),
+        balanceApi.getBalance({ limit: 50 }),
         balanceApi.getUsdtBalance(),
         ratesApi.getAll(),
       ]);
@@ -189,9 +191,21 @@ const WalletPage = () => {
     return types[type] || type;
   };
 
+  // Filter transactions based on active tab
+  const filteredTransactions = data?.transactions?.filter((tx: BalanceTransaction) => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'deposits') {
+      return tx.type.includes('DEPOSIT') || tx.type === 'ORDER_REFUND';
+    }
+    if (activeTab === 'withdrawals') {
+      return tx.type.includes('WITHDRAWAL') || tx.type === 'ORDER_PAYMENT';
+    }
+    return true;
+  }) || [];
+
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
+      <div className="flex justify-center items-center min-h-[300px]">
         <Spinner size="lg" />
       </div>
     );
@@ -211,20 +225,17 @@ const WalletPage = () => {
   const currentBalance = parseFloat(data?.balance?.balance || '0');
 
   return (
-    <div className="space-y-5 max-w-lg mx-auto pb-6">
+    <div className="space-y-4">
       {/* KES Balance Card */}
-      <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
-          <div className="absolute -right-4 top-12 w-20 h-20 border-[12px] border-white rounded-full"></div>
         </div>
 
         <div className="relative">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center">
-                <span className="text-xs">🇰🇪</span>
-              </div>
+              <span className="text-lg">🇰🇪</span>
               <span className="text-sm font-medium">KES Balance</span>
             </div>
             <button
@@ -239,8 +250,7 @@ const WalletPage = () => {
             </button>
           </div>
 
-          <p className="text-xs text-green-100 mb-1">Available Balance</p>
-          <p className="text-4xl font-bold mb-4">
+          <p className="text-3xl font-bold mb-4">
             Ksh {showBalance
               ? currentBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })
               : '••••••'
@@ -248,102 +258,108 @@ const WalletPage = () => {
           </p>
 
           <div className="flex gap-3">
-            <Button
+            <button
               onClick={() => setShowDepositModal(true)}
-              className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
+              className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2.5 px-4 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors"
             >
-              <ArrowDownLeft className="h-4 w-4 mr-2" />
+              <ArrowDownLeft className="h-4 w-4" />
               Deposit
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={() => setShowWithdrawModal(true)}
               disabled={currentBalance < 10}
-              className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
+              className="flex-1 bg-white/20 hover:bg-white/30 disabled:opacity-50 text-white py-2.5 px-4 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors"
             >
-              <ArrowUpRight className="h-4 w-4 mr-2" />
+              <ArrowUpRight className="h-4 w-4" />
               Withdraw
-            </Button>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Current Rate Card */}
+      {/* Current Rate */}
       {usdtRate > 0 && (
-        <Card className="bg-blue-50 border-blue-100">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600 font-medium">Current Rate</p>
-                <p className="text-lg font-bold text-blue-800">1 USDT = KES {usdtRate.toLocaleString()}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-blue-600">Deposit USDT</p>
-                <p className="text-xs text-blue-600">Get KES instantly</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="bg-blue-50 rounded-xl p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-blue-600 text-sm">Rate:</span>
+            <span className="font-semibold text-blue-800">1 USDT = KES {usdtRate.toLocaleString()}</span>
+          </div>
+          <button onClick={fetchBalance} className="p-1.5 hover:bg-blue-100 rounded-lg">
+            <RefreshCw className="h-4 w-4 text-blue-600" />
+          </button>
+        </div>
       )}
 
-      {/* Transaction History */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between py-4">
-          <CardTitle className="text-base">Transaction History</CardTitle>
-          <Button variant="ghost" size="sm" onClick={fetchBalance}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {data?.transactions && data.transactions.length > 0 ? (
-            <div className="space-y-1">
-              {data.transactions.map((tx: BalanceTransaction) => (
-                <div key={tx.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      tx.type.includes('DEPOSIT') || tx.type === 'ORDER_REFUND'
-                        ? 'bg-green-100'
-                        : 'bg-red-100'
-                    }`}>
-                      {getTransactionIcon(tx.type)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{formatTransactionType(tx.type)}</p>
-                      <p className="text-xs text-gray-500">{formatDate(tx.createdAt)}</p>
-                    </div>
+      {/* Transaction Tabs */}
+      <div className="bg-white rounded-xl overflow-hidden">
+        <div className="flex border-b border-gray-100">
+          {[
+            { key: 'all', label: 'All' },
+            { key: 'deposits', label: 'Deposits' },
+            { key: 'withdrawals', label: 'Withdrawals' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as TabType)}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'text-green-600 border-b-2 border-green-600 bg-green-50/50'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Transaction List */}
+        <div className="divide-y divide-gray-50">
+          {filteredTransactions.length > 0 ? (
+            filteredTransactions.map((tx: BalanceTransaction) => (
+              <div key={tx.id} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                    tx.type.includes('DEPOSIT') || tx.type === 'ORDER_REFUND'
+                      ? 'bg-green-100'
+                      : 'bg-red-100'
+                  }`}>
+                    {getTransactionIcon(tx.type)}
                   </div>
-                  <div className="text-right">
-                    <p className={`text-sm font-semibold ${
-                      parseFloat(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {parseFloat(tx.amount) >= 0 ? '+' : ''}
-                      Ksh {Math.abs(parseFloat(tx.amount)).toLocaleString()}
-                    </p>
-                    <Badge variant={getStatusVariant(tx.status)} className="text-[10px]">
-                      {tx.status}
-                    </Badge>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{formatTransactionType(tx.type)}</p>
+                    <p className="text-xs text-gray-500">{formatDate(tx.createdAt)}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <div className="text-right">
+                  <p className={`text-sm font-semibold ${
+                    parseFloat(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {parseFloat(tx.amount) >= 0 ? '+' : ''}
+                    Ksh {Math.abs(parseFloat(tx.amount)).toLocaleString()}
+                  </p>
+                  <Badge variant={getStatusVariant(tx.status)} className="text-[10px]">
+                    {tx.status}
+                  </Badge>
+                </div>
               </div>
-              <p className="text-gray-500 text-sm">No transactions yet</p>
+            ))
+          ) : (
+            <div className="text-center py-10">
+              <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+                <Receipt className="w-6 h-6 text-gray-300" />
+              </div>
+              <p className="text-gray-500 text-sm">No {activeTab === 'all' ? '' : activeTab} transactions</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Deposit Modal */}
       {showDepositModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">Deposit USDT</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 max-h-[85vh] overflow-y-auto animate-slide-up">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold">Deposit USDT</h2>
               <button
                 onClick={() => setShowDepositModal(false)}
                 className="p-2 hover:bg-gray-100 rounded-full"
@@ -355,13 +371,10 @@ const WalletPage = () => {
             <div className="space-y-4">
               {/* Rate info */}
               {usdtRate > 0 && (
-                <div className="bg-green-50 rounded-xl p-4">
-                  <p className="text-sm text-green-700 mb-1">Current Rate</p>
-                  <p className="text-2xl font-bold text-green-800">
+                <div className="bg-green-50 rounded-xl p-4 text-center">
+                  <p className="text-xs text-green-600 mb-1">Current Rate</p>
+                  <p className="text-xl font-bold text-green-800">
                     1 USDT = KES {usdtRate.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">
-                    Send USDT and receive KES in your balance
                   </p>
                 </div>
               )}
@@ -369,17 +382,16 @@ const WalletPage = () => {
               {/* Deposit Address */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Send USDT (TRC-20) to this address:
+                  Send USDT (TRC-20) to:
                 </label>
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <code className="text-sm break-all font-mono text-gray-800">
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <code className="text-xs break-all font-mono text-gray-800 flex-1">
                       {depositAddress || 'Loading...'}
                     </code>
                     <button
                       onClick={copyAddress}
                       className="p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0"
-                      title="Copy address"
                     >
                       {copied ? (
                         <CheckCircle className="h-5 w-5 text-green-600" />
@@ -392,29 +404,19 @@ const WalletPage = () => {
               </div>
 
               {/* Network Warning */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                <p className="text-sm text-yellow-800">
-                  <strong>Important:</strong> Only send USDT on the <strong>TRON network (TRC-20)</strong>.
-                  Deposits from other networks will be lost.
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                <p className="text-xs text-yellow-800">
+                  <strong>⚠️ TRON Network Only</strong> - Sending from other networks will result in loss of funds.
                 </p>
               </div>
 
               {/* Steps */}
               <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-sm font-medium text-gray-700 mb-3">How it works:</p>
-                <ol className="text-sm text-gray-600 space-y-2">
-                  <li className="flex gap-2">
-                    <span className="font-bold text-green-600">1.</span>
-                    Send USDT to the address above
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-bold text-green-600">2.</span>
-                    We receive and convert your USDT at the current rate
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-bold text-green-600">3.</span>
-                    KES is credited to your balance instantly
-                  </li>
+                <p className="text-xs font-medium text-gray-500 mb-2">HOW IT WORKS</p>
+                <ol className="text-sm text-gray-700 space-y-1.5">
+                  <li>1. Send USDT to the address above</li>
+                  <li>2. We convert at the current rate</li>
+                  <li>3. KES credited to your balance</li>
                 </ol>
               </div>
 
@@ -432,10 +434,10 @@ const WalletPage = () => {
 
       {/* Withdraw Modal */}
       {showWithdrawModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">Withdraw to M-Pesa</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 animate-slide-up">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold">Withdraw to M-Pesa</h2>
               <button
                 onClick={() => { setShowWithdrawModal(false); setFormError(null); setFormSuccess(null); }}
                 className="p-2 hover:bg-gray-100 rounded-full"
@@ -444,13 +446,13 @@ const WalletPage = () => {
               </button>
             </div>
 
-            {formError && <Alert variant="error" className="mb-4">{formError}</Alert>}
-            {formSuccess && <Alert variant="success" className="mb-4">{formSuccess}</Alert>}
+            {formError && <Alert variant="error" className="mb-4 text-sm">{formError}</Alert>}
+            {formSuccess && <Alert variant="success" className="mb-4 text-sm">{formSuccess}</Alert>}
 
             {/* Available Balance */}
-            <div className="bg-green-50 rounded-xl p-4 mb-4">
-              <p className="text-sm text-green-600">Available Balance</p>
-              <p className="text-2xl font-bold text-green-800">
+            <div className="bg-green-50 rounded-xl p-3 mb-4 text-center">
+              <p className="text-xs text-green-600">Available</p>
+              <p className="text-xl font-bold text-green-800">
                 Ksh {currentBalance.toLocaleString()}
               </p>
             </div>
@@ -478,11 +480,11 @@ const WalletPage = () => {
                 disabled={isSubmitting}
               />
 
-              <p className="text-xs text-gray-500">
-                Minimum: KES 10 • Maximum: KES 70,000
+              <p className="text-xs text-gray-500 text-center">
+                Min: KES 10 • Max: KES 70,000
               </p>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3">
                 <Button
                   type="button"
                   variant="outline"
@@ -507,5 +509,12 @@ const WalletPage = () => {
     </div>
   );
 };
+
+// Receipt icon component for empty state
+const Receipt = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
 
 export default WalletPage;
