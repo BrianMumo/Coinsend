@@ -1,6 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Wallet, User } from 'lucide-react';
+import { Home, Wallet, User, MessageCircle } from 'lucide-react';
 import { clsx } from 'clsx';
+
+const WHATSAPP_NUMBER = '+254768294351';
+const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`;
 
 const navItems = [
   { to: '/dashboard', icon: Home, label: 'Home' },
@@ -39,6 +42,16 @@ export const BottomNav = () => {
             </Link>
           );
         })}
+        {/* Support (WhatsApp) */}
+        <a
+          href={WHATSAPP_LINK}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col items-center justify-center flex-1 h-full transition-colors text-gray-400 hover:text-green-600"
+        >
+          <MessageCircle className="h-5 w-5" />
+          <span className="text-xs mt-1 font-normal">Support</span>
+        </a>
       </div>
     </nav>
   );

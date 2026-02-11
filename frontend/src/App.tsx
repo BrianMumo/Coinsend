@@ -1,9 +1,8 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { PageLoader } from './components/ui/Spinner';
 import { UserLayout } from './components/layout/UserLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
-import { WhatsAppButton } from './components/ui/WhatsAppButton';
 import { ToastContainer } from './components/ui/Toast';
 
 // Public pages
@@ -32,14 +31,10 @@ const AdminWalletsPage = lazy(() => import('./pages/admin/AdminWalletsPage'));
 const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage'));
 
 function App() {
-  const location = useLocation();
-  const isAdminRoute = location.pathname.startsWith('/mumo');
-
   return (
     <>
       <ToastContainer />
       <Suspense fallback={<PageLoader />}>
-        {!isAdminRoute && <WhatsAppButton />}
         <Routes>
         {/* Public routes */}
         <Route path="/" element={<HomePage />} />
