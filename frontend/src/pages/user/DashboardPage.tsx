@@ -4,10 +4,9 @@ import { useAuthStore } from '../../store/authStore';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Badge, getStatusVariant } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
-import { ordersApi } from '../../api/orders.api';
 import { balanceApi } from '../../api/balance.api';
-import { Order, BalanceTransaction } from '../../types';
-import { formatCurrency, formatDate, formatStatus } from '../../utils/formatters';
+import { BalanceTransaction } from '../../types';
+import { formatDate, formatStatus } from '../../utils/formatters';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -20,28 +19,18 @@ import {
 const DashboardPage = () => {
   const { user, updateUser } = useAuthStore();
   const navigate = useNavigate();
-  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<BalanceTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showBalance, setShowBalance] = useState(true);
   const [kesBalance, setKesBalance] = useState('0');
-  const [usdtBalance, setUsdtBalance] = useState('0');
 
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [ordersResponse, balanceResponse] = await Promise.all([
-        ordersApi.getAll({ limit: 5, sortBy: 'createdAt', sortOrder: 'desc' }),
-        balanceApi.getBalance({ limit: 10 }),
-      ]);
-
-      if (ordersResponse.success && ordersResponse.data) {
-        setRecentOrders(ordersResponse.data);
-      }
+      const balanceResponse = await balanceApi.getBalance({ limit: 10 });
 
       if (balanceResponse.success && balanceResponse.data) {
         setKesBalance(balanceResponse.data.balance.balance);
-        setUsdtBalance(balanceResponse.data.balance.usdtBalance || '0');
         setRecentTransactions(balanceResponse.data.transactions || []);
 
         // Update user balance in store
@@ -64,18 +53,14 @@ const DashboardPage = () => {
     fetchData();
   }, [fetchData]);
 
-  const formatOrderType = (type: string) => {
-    return type === 'CRYPTO_TO_KES' ? 'Sell USDT' : 'Buy USDT';
-  };
-
   const formatTransactionType = (type: string) => {
     const types: Record<string, string> = {
-      DEPOSIT: 'Deposit',
+      DEPOSIT: 'KES Deposit',
       WITHDRAWAL: 'Withdrawal',
       ORDER_PAYMENT: 'Order Payment',
       ORDER_REFUND: 'Refund',
       ADJUSTMENT: 'Adjustment',
-      USDT_DEPOSIT: 'USDT Deposit',
+      USDT_DEPOSIT: 'USDT → KES',
       USDT_WITHDRAWAL: 'USDT Withdrawal',
     };
     return types[type] || type;
@@ -88,16 +73,13 @@ const DashboardPage = () => {
     return <ArrowUpRight className="h-4 w-4 text-red-600" />;
   };
 
-  // Combine and sort transactions and orders for display
-  const combinedHistory = [...recentTransactions.slice(0, 5)];
-
   return (
     <div className="space-y-5 max-w-lg mx-auto pb-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-            <span className="text-blue-600 font-semibold text-sm">
+          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+            <span className="text-green-600 font-semibold text-sm">
               {user?.firstName?.[0] || user?.email?.[0] || 'U'}
             </span>
           </div>
@@ -114,113 +96,75 @@ const DashboardPage = () => {
         </button>
       </div>
 
-      {/* Balance Cards - Horizontal Scroll */}
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
-        {/* KES Balance Card */}
-        <div className="min-w-[280px] snap-start">
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white relative overflow-hidden">
-            {/* Decorative pattern */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
-              <div className="absolute -right-4 top-12 w-20 h-20 border-[12px] border-white rounded-full"></div>
-            </div>
-
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
-                  <span className="text-[10px] font-bold">🇰🇪</span>
-                </div>
-                <span className="text-sm font-medium">Kenyan Shilling (KES)</span>
-              </div>
-
-              <p className="text-xs text-green-100 mb-1">Available Balance</p>
-              <div className="flex items-center gap-2">
-                <p className="text-3xl font-bold">
-                  Ksh {showBalance
-                    ? parseFloat(kesBalance).toLocaleString(undefined, { minimumFractionDigits: 0 })
-                    : '••••••'
-                  }
-                </p>
-                <button
-                  onClick={() => setShowBalance(!showBalance)}
-                  className="p-1 hover:bg-white/10 rounded transition-colors"
-                >
-                  {showBalance ? (
-                    <EyeOff className="h-5 w-5 text-green-100" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-green-100" />
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
+      {/* KES Balance Card */}
+      <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white relative overflow-hidden">
+        {/* Decorative pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
+          <div className="absolute -right-4 top-12 w-20 h-20 border-[12px] border-white rounded-full"></div>
         </div>
 
-        {/* USDT Balance Card */}
-        <div className="min-w-[280px] snap-start">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white relative overflow-hidden">
-            {/* Decorative pattern */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
-              <div className="absolute -right-4 top-12 w-20 h-20 border-[12px] border-white rounded-full"></div>
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-xs">🇰🇪</span>
             </div>
+            <span className="text-sm font-medium">Kenyan Shilling (KES)</span>
+          </div>
 
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
-                  <span className="text-[10px] font-bold">₮</span>
-                </div>
-                <span className="text-sm font-medium">Tether (USDT)</span>
-              </div>
-
-              <p className="text-xs text-blue-100 mb-1">Available Balance</p>
-              <div className="flex items-center gap-2">
-                <p className="text-3xl font-bold">
-                  $ {showBalance
-                    ? parseFloat(usdtBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                    : '••••••'
-                  }
-                </p>
-              </div>
-            </div>
+          <p className="text-xs text-green-100 mb-1">Available Balance</p>
+          <div className="flex items-center gap-3">
+            <p className="text-4xl font-bold">
+              Ksh {showBalance
+                ? parseFloat(kesBalance).toLocaleString(undefined, { minimumFractionDigits: 0 })
+                : '••••••'
+              }
+            </p>
+            <button
+              onClick={() => setShowBalance(!showBalance)}
+              className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
+            >
+              {showBalance ? (
+                <EyeOff className="h-5 w-5 text-green-100" />
+              ) : (
+                <Eye className="h-5 w-5 text-green-100" />
+              )}
+            </button>
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="flex justify-center gap-8">
+      <div className="flex justify-center gap-12">
         <button
-          onClick={() => navigate('/wallet')}
+          onClick={() => navigate('/wallet', { state: { action: 'deposit' } })}
           className="flex flex-col items-center gap-2"
         >
-          <div className="w-14 h-14 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
-            <ArrowDownLeft className="h-6 w-6 text-gray-700" />
+          <div className="w-14 h-14 bg-green-100 hover:bg-green-200 rounded-full flex items-center justify-center transition-colors">
+            <ArrowDownLeft className="h-6 w-6 text-green-700" />
           </div>
           <span className="text-sm text-gray-700 font-medium">Deposit</span>
         </button>
 
         <button
-          onClick={() => navigate('/wallet')}
+          onClick={() => navigate('/wallet', { state: { action: 'withdraw' } })}
           className="flex flex-col items-center gap-2"
         >
-          <div className="w-14 h-14 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
-            <ArrowUpRight className="h-6 w-6 text-gray-700" />
+          <div className="w-14 h-14 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors">
+            <ArrowUpRight className="h-6 w-6 text-red-700" />
           </div>
           <span className="text-sm text-gray-700 font-medium">Withdraw</span>
         </button>
-
-        <button
-          onClick={() => navigate('/orders/new/crypto-to-kes')}
-          className="flex flex-col items-center gap-2"
-        >
-          <div className="w-14 h-14 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
-            <svg className="h-6 w-6 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
-            </svg>
-          </div>
-          <span className="text-sm text-gray-700 font-medium">Exchange</span>
-        </button>
       </div>
+
+      {/* How it works - Brief */}
+      <Card className="bg-blue-50 border-blue-100">
+        <CardContent className="py-4">
+          <p className="text-sm text-blue-800">
+            <strong>How it works:</strong> Deposit USDT to get KES instantly. Withdraw KES to your M-Pesa anytime.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Transaction History */}
       <Card>
@@ -239,18 +183,17 @@ const DashboardPage = () => {
             <div className="flex justify-center py-12">
               <Spinner size="md" />
             </div>
-          ) : combinedHistory.length === 0 && recentOrders.length === 0 ? (
+          ) : recentTransactions.length === 0 ? (
             <div className="text-center py-12">
-              <div className="w-24 h-24 mx-auto mb-4 opacity-50">
-                <svg viewBox="0 0 100 100" fill="none" className="text-gray-300">
-                  <path d="M20 80 L50 20 L80 80 Z" fill="currentColor" opacity="0.3"/>
-                  <path d="M15 85 L85 85" stroke="currentColor" strokeWidth="2"/>
-                  <circle cx="50" cy="50" r="3" fill="currentColor"/>
+              <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                <svg className="w-10 h-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="text-gray-400">You have no transaction record yet</p>
+              <p className="text-gray-500 mb-1">No transactions yet</p>
+              <p className="text-sm text-gray-400">Deposit USDT to get started</p>
               <button
-                onClick={() => navigate('/wallet')}
+                onClick={() => navigate('/wallet', { state: { action: 'deposit' } })}
                 className="mt-4 text-sm text-green-600 hover:text-green-700 font-medium"
               >
                 Make your first deposit →
@@ -258,8 +201,7 @@ const DashboardPage = () => {
             </div>
           ) : (
             <div className="space-y-1">
-              {/* Show balance transactions */}
-              {combinedHistory.map((tx) => (
+              {recentTransactions.slice(0, 5).map((tx) => (
                 <Link
                   key={tx.id}
                   to="/wallet"
@@ -285,48 +227,10 @@ const DashboardPage = () => {
                       parseFloat(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
                       {parseFloat(tx.amount) >= 0 ? '+' : ''}
-                      {tx.currency === 'USDT'
-                        ? `$${Math.abs(parseFloat(tx.amount)).toFixed(2)}`
-                        : `Ksh ${Math.abs(parseFloat(tx.amount)).toLocaleString()}`
-                      }
+                      Ksh {Math.abs(parseFloat(tx.amount)).toLocaleString()}
                     </p>
                     <Badge variant={getStatusVariant(tx.status)} className="text-[10px]">
                       {formatStatus(tx.status)}
-                    </Badge>
-                  </div>
-                </Link>
-              ))}
-
-              {/* Show recent orders if no balance transactions */}
-              {combinedHistory.length === 0 && recentOrders.map((order) => (
-                <Link
-                  key={order.id}
-                  to={`/orders/${order.id}`}
-                  className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      order.orderType === 'CRYPTO_TO_KES' ? 'bg-green-100' : 'bg-blue-100'
-                    }`}>
-                      {order.orderType === 'CRYPTO_TO_KES' ? (
-                        <ArrowDownLeft className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <ArrowUpRight className="h-4 w-4 text-blue-600" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {formatOrderType(order.orderType)}
-                      </p>
-                      <p className="text-xs text-gray-500">{formatDate(order.createdAt)}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {formatCurrency(order.sourceAmount, order.sourceCurrency)}
-                    </p>
-                    <Badge variant={getStatusVariant(order.status)} className="text-[10px]">
-                      {formatStatus(order.status)}
                     </Badge>
                   </div>
                 </Link>
