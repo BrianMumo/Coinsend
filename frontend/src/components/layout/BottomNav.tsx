@@ -1,11 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Wallet, Receipt, User } from 'lucide-react';
+import { Home, Wallet, User } from 'lucide-react';
 import { clsx } from 'clsx';
 
 const navItems = [
   { to: '/dashboard', icon: Home, label: 'Home' },
   { to: '/wallet', icon: Wallet, label: 'Wallet' },
-  { to: '/orders', icon: Receipt, label: 'Orders' },
   { to: '/profile', icon: User, label: 'Profile' },
 ];
 

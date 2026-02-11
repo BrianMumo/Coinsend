@@ -14,11 +14,6 @@ const RatesPage = lazy(() => import('./pages/public/RatesPage'));
 
 // User pages
 const DashboardPage = lazy(() => import('./pages/user/DashboardPage'));
-const NewOrderPage = lazy(() => import('./pages/user/NewOrderPage'));
-const CryptoToKesPage = lazy(() => import('./pages/user/CryptoToKesPage'));
-const KesToCryptoPage = lazy(() => import('./pages/user/KesToCryptoPage'));
-const OrdersPage = lazy(() => import('./pages/user/OrdersPage'));
-const OrderDetailPage = lazy(() => import('./pages/user/OrderDetailPage'));
 const ProfilePage = lazy(() => import('./pages/user/ProfilePage'));
 const WalletPage = lazy(() => import('./pages/user/WalletPage'));
 
@@ -54,11 +49,6 @@ function App() {
 
         {/* User routes */}
         <Route path="/dashboard" element={<UserLayout><DashboardPage /></UserLayout>} />
-        <Route path="/orders/new" element={<UserLayout><NewOrderPage /></UserLayout>} />
-        <Route path="/orders/new/crypto-to-kes" element={<UserLayout><CryptoToKesPage /></UserLayout>} />
-        <Route path="/orders/new/kes-to-crypto" element={<UserLayout><KesToCryptoPage /></UserLayout>} />
-        <Route path="/orders" element={<UserLayout><OrdersPage /></UserLayout>} />
-        <Route path="/orders/:id" element={<UserLayout><OrderDetailPage /></UserLayout>} />
         <Route path="/wallet" element={<UserLayout><WalletPage /></UserLayout>} />
         <Route path="/profile" element={<UserLayout><ProfilePage /></UserLayout>} />
 
