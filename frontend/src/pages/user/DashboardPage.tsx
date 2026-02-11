@@ -1,173 +1,311 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Badge, getStatusVariant } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
-import { PageTitle } from '../../components/ui/PageTitle';
 import { ordersApi } from '../../api/orders.api';
-import { Order } from '../../types';
+import { balanceApi } from '../../api/balance.api';
+import { Order, BalanceTransaction } from '../../types';
 import { formatCurrency, formatDate, formatStatus } from '../../utils/formatters';
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Wallet,
-  Clock,
-  CheckCircle,
-  TrendingUp,
   ChevronRight,
+  Eye,
+  EyeOff,
+  Bell,
 } from 'lucide-react';
 
 const DashboardPage = () => {
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
+  const navigate = useNavigate();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<BalanceTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalOrders: 0,
-    pendingOrders: 0,
-    completedOrders: 0,
-  });
+  const [showBalance, setShowBalance] = useState(true);
+  const [kesBalance, setKesBalance] = useState('0');
+  const [usdtBalance, setUsdtBalance] = useState('0');
+
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [ordersResponse, balanceResponse] = await Promise.all([
+        ordersApi.getAll({ limit: 5, sortBy: 'createdAt', sortOrder: 'desc' }),
+        balanceApi.getBalance({ limit: 10 }),
+      ]);
+
+      if (ordersResponse.success && ordersResponse.data) {
+        setRecentOrders(ordersResponse.data);
+      }
+
+      if (balanceResponse.success && balanceResponse.data) {
+        setKesBalance(balanceResponse.data.balance.balance);
+        setUsdtBalance(balanceResponse.data.balance.usdtBalance || '0');
+        setRecentTransactions(balanceResponse.data.transactions || []);
+
+        // Update user balance in store
+        updateUser({
+          balance: {
+            balance: balanceResponse.data.balance.balance,
+            usdtBalance: balanceResponse.data.balance.usdtBalance,
+            currency: balanceResponse.data.balance.currency,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [updateUser]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await ordersApi.getAll({ limit: 5, sortBy: 'createdAt', sortOrder: 'desc' });
-        if (response.success && response.data) {
-          setRecentOrders(response.data);
-          setStats({
-            totalOrders: response.pagination?.total || 0,
-            pendingOrders: response.data.filter((o) => ['PENDING', 'PAID'].includes(o.status)).length,
-            completedOrders: response.data.filter((o) => o.status === 'COMPLETED').length,
-          });
-        }
-      } catch (err) {
-        console.error('Failed to fetch orders:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const formatOrderType = (type: string) => {
     return type === 'CRYPTO_TO_KES' ? 'Sell USDT' : 'Buy USDT';
   };
 
-  return (
-    <div className="space-y-4 max-w-2xl mx-auto">
-      <PageTitle title="Dashboard" description="Manage your USDT transactions on Coinsend." />
+  const formatTransactionType = (type: string) => {
+    const types: Record<string, string> = {
+      DEPOSIT: 'Deposit',
+      WITHDRAWAL: 'Withdrawal',
+      ORDER_PAYMENT: 'Order Payment',
+      ORDER_REFUND: 'Refund',
+      ADJUSTMENT: 'Adjustment',
+      USDT_DEPOSIT: 'USDT Deposit',
+      USDT_WITHDRAWAL: 'USDT Withdrawal',
+    };
+    return types[type] || type;
+  };
 
-      {/* Welcome */}
-      <div className="pb-2">
-        <h1 className="text-xl font-bold text-gray-900">
-          Hi, {user?.firstName || 'there'}!
-        </h1>
-        <p className="text-sm text-gray-500">Welcome to Coinsend</p>
+  const getTransactionIcon = (type: string) => {
+    if (type.includes('DEPOSIT') || type === 'ORDER_REFUND') {
+      return <ArrowDownLeft className="h-4 w-4 text-green-600" />;
+    }
+    return <ArrowUpRight className="h-4 w-4 text-red-600" />;
+  };
+
+  // Combine and sort transactions and orders for display
+  const combinedHistory = [...recentTransactions.slice(0, 5)];
+
+  return (
+    <div className="space-y-5 max-w-lg mx-auto pb-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <span className="text-blue-600 font-semibold text-sm">
+              {user?.firstName?.[0] || user?.email?.[0] || 'U'}
+            </span>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Hi,</p>
+            <p className="font-semibold text-gray-900">
+              {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Welcome'}
+            </p>
+          </div>
+        </div>
+        <button className="relative p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <Bell className="h-5 w-5 text-gray-600" />
+          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+        </button>
       </div>
 
-      {/* Balance Card - Compact */}
-      <Card className="bg-gradient-to-r from-primary-500 to-primary-600 text-white">
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-primary-100 uppercase tracking-wide">KES Balance</p>
-              <p className="text-2xl font-bold mt-1">
-                {parseFloat(user?.balance?.balance || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
+      {/* Balance Cards - Horizontal Scroll */}
+      <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+        {/* KES Balance Card */}
+        <div className="min-w-[280px] snap-start">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white relative overflow-hidden">
+            {/* Decorative pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
+              <div className="absolute -right-4 top-12 w-20 h-20 border-[12px] border-white rounded-full"></div>
             </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                  <span className="text-[10px] font-bold">🇰🇪</span>
+                </div>
+                <span className="text-sm font-medium">Kenyan Shilling (KES)</span>
+              </div>
+
+              <p className="text-xs text-green-100 mb-1">Available Balance</p>
+              <div className="flex items-center gap-2">
+                <p className="text-3xl font-bold">
+                  Ksh {showBalance
+                    ? parseFloat(kesBalance).toLocaleString(undefined, { minimumFractionDigits: 0 })
+                    : '••••••'
+                  }
+                </p>
+                <button
+                  onClick={() => setShowBalance(!showBalance)}
+                  className="p-1 hover:bg-white/10 rounded transition-colors"
+                >
+                  {showBalance ? (
+                    <EyeOff className="h-5 w-5 text-green-100" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-green-100" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* USDT Balance Card */}
+        <div className="min-w-[280px] snap-start">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white relative overflow-hidden">
+            {/* Decorative pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
+              <div className="absolute -right-4 top-12 w-20 h-20 border-[12px] border-white rounded-full"></div>
+            </div>
+
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                  <span className="text-[10px] font-bold">₮</span>
+                </div>
+                <span className="text-sm font-medium">Tether (USDT)</span>
+              </div>
+
+              <p className="text-xs text-blue-100 mb-1">Available Balance</p>
+              <div className="flex items-center gap-2">
+                <p className="text-3xl font-bold">
+                  $ {showBalance
+                    ? parseFloat(usdtBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : '••••••'
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="flex justify-center gap-8">
+        <button
+          onClick={() => navigate('/wallet')}
+          className="flex flex-col items-center gap-2"
+        >
+          <div className="w-14 h-14 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+            <ArrowDownLeft className="h-6 w-6 text-gray-700" />
+          </div>
+          <span className="text-sm text-gray-700 font-medium">Deposit</span>
+        </button>
+
+        <button
+          onClick={() => navigate('/wallet')}
+          className="flex flex-col items-center gap-2"
+        >
+          <div className="w-14 h-14 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+            <ArrowUpRight className="h-6 w-6 text-gray-700" />
+          </div>
+          <span className="text-sm text-gray-700 font-medium">Withdraw</span>
+        </button>
+
+        <button
+          onClick={() => navigate('/orders/new/crypto-to-kes')}
+          className="flex flex-col items-center gap-2"
+        >
+          <div className="w-14 h-14 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+            <svg className="h-6 w-6 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+          </div>
+          <span className="text-sm text-gray-700 font-medium">Exchange</span>
+        </button>
+      </div>
+
+      {/* Transaction History */}
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900">Transaction history</h3>
             <Link
               to="/wallet"
-              className="flex items-center gap-1 text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-full transition-colors"
+              className="text-sm text-green-600 hover:text-green-700 flex items-center font-medium"
             >
-              <Wallet className="h-3.5 w-3.5" />
-              Top Up
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions - 2 columns, compact */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link to="/orders/new/crypto-to-kes">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 border-transparent hover:border-green-200">
-            <CardContent className="py-4 text-center">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                <ArrowDownLeft className="h-5 w-5 text-green-600" />
-              </div>
-              <p className="font-semibold text-sm">Sell USDT</p>
-              <p className="text-xs text-gray-500">Get KES</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link to="/orders/new/kes-to-crypto">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-200">
-            <CardContent className="py-4 text-center">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                <ArrowUpRight className="h-5 w-5 text-blue-600" />
-              </div>
-              <p className="font-semibold text-sm">Buy USDT</p>
-              <p className="text-xs text-gray-500">Pay with KES</p>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
-
-      {/* Stats Row - Compact horizontal */}
-      <div className="grid grid-cols-3 gap-2">
-        <Card>
-          <CardContent className="py-3 text-center">
-            <Clock className="h-4 w-4 text-amber-500 mx-auto mb-1" />
-            <p className="text-lg font-bold">{stats.pendingOrders}</p>
-            <p className="text-[10px] text-gray-500 uppercase">Pending</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 text-center">
-            <CheckCircle className="h-4 w-4 text-green-500 mx-auto mb-1" />
-            <p className="text-lg font-bold">{stats.completedOrders}</p>
-            <p className="text-[10px] text-gray-500 uppercase">Completed</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 text-center">
-            <TrendingUp className="h-4 w-4 text-gray-500 mx-auto mb-1" />
-            <p className="text-lg font-bold">{stats.totalOrders}</p>
-            <p className="text-[10px] text-gray-500 uppercase">Total</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Orders - Compact list */}
-      <Card>
-        <CardContent className="py-3">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-sm">Recent Orders</h3>
-            <Link to="/orders" className="text-xs text-primary-600 hover:text-primary-700 flex items-center">
-              View all <ChevronRight className="h-3 w-3" />
+              See all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
 
           {isLoading ? (
-            <div className="flex justify-center py-6">
-              <Spinner size="sm" />
+            <div className="flex justify-center py-12">
+              <Spinner size="md" />
             </div>
-          ) : recentOrders.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-sm text-gray-500">No orders yet</p>
-              <p className="text-xs text-gray-400 mt-1">Start by buying or selling USDT</p>
+          ) : combinedHistory.length === 0 && recentOrders.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-24 h-24 mx-auto mb-4 opacity-50">
+                <svg viewBox="0 0 100 100" fill="none" className="text-gray-300">
+                  <path d="M20 80 L50 20 L80 80 Z" fill="currentColor" opacity="0.3"/>
+                  <path d="M15 85 L85 85" stroke="currentColor" strokeWidth="2"/>
+                  <circle cx="50" cy="50" r="3" fill="currentColor"/>
+                </svg>
+              </div>
+              <p className="text-gray-400">You have no transaction record yet</p>
+              <button
+                onClick={() => navigate('/wallet')}
+                className="mt-4 text-sm text-green-600 hover:text-green-700 font-medium"
+              >
+                Make your first deposit →
+              </button>
             </div>
           ) : (
-            <div className="space-y-2">
-              {recentOrders.slice(0, 4).map((order) => (
+            <div className="space-y-1">
+              {/* Show balance transactions */}
+              {combinedHistory.map((tx) => (
+                <Link
+                  key={tx.id}
+                  to="/wallet"
+                  className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      tx.type.includes('DEPOSIT') || tx.type === 'ORDER_REFUND'
+                        ? 'bg-green-100'
+                        : 'bg-red-100'
+                    }`}>
+                      {getTransactionIcon(tx.type)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {formatTransactionType(tx.type)}
+                      </p>
+                      <p className="text-xs text-gray-500">{formatDate(tx.createdAt)}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-semibold ${
+                      parseFloat(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {parseFloat(tx.amount) >= 0 ? '+' : ''}
+                      {tx.currency === 'USDT'
+                        ? `$${Math.abs(parseFloat(tx.amount)).toFixed(2)}`
+                        : `Ksh ${Math.abs(parseFloat(tx.amount)).toLocaleString()}`
+                      }
+                    </p>
+                    <Badge variant={getStatusVariant(tx.status)} className="text-[10px]">
+                      {formatStatus(tx.status)}
+                    </Badge>
+                  </div>
+                </Link>
+              ))}
+
+              {/* Show recent orders if no balance transactions */}
+              {combinedHistory.length === 0 && recentOrders.map((order) => (
                 <Link
                   key={order.id}
                   to={`/orders/${order.id}`}
-                  className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                       order.orderType === 'CRYPTO_TO_KES' ? 'bg-green-100' : 'bg-blue-100'
                     }`}>
                       {order.orderType === 'CRYPTO_TO_KES' ? (
@@ -177,15 +315,17 @@ const DashboardPage = () => {
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{formatOrderType(order.orderType)}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {formatOrderType(order.orderType)}
+                      </p>
                       <p className="text-xs text-gray-500">{formatDate(order.createdAt)}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium">
+                    <p className="text-sm font-semibold text-gray-900">
                       {formatCurrency(order.sourceAmount, order.sourceCurrency)}
                     </p>
-                    <Badge variant={getStatusVariant(order.status)} className="text-[10px] px-1.5 py-0">
+                    <Badge variant={getStatusVariant(order.status)} className="text-[10px]">
                       {formatStatus(order.status)}
                     </Badge>
                   </div>
