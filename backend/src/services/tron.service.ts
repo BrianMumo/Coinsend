@@ -637,6 +637,9 @@ class TronService {
       let transferAmount = 0;
       let toAddress = '';
       let fromAddress = '';
+      let contractAddress = '';
+
+      logger.info(`Transaction ${txHash} has ${logs.length} logs`);
 
       for (const log of logs) {
         // Transfer event topic: keccak256("Transfer(address,address,uint256)")
@@ -647,6 +650,10 @@ class TronService {
           toAddress = tronWeb.address.fromHex('41' + log.topics[2].slice(24));
           // Decode amount from data (6 decimals for USDT)
           transferAmount = parseInt(log.data, 16) / 1_000_000;
+          // Get contract address from log (more reliable than txInfo.contract_address)
+          contractAddress = tronWeb.address.fromHex('41' + log.address);
+
+          logger.info(`Parsed Transfer: ${transferAmount} from ${fromAddress} to ${toAddress}, contract: ${contractAddress}`);
         }
       }
 
@@ -659,9 +666,9 @@ class TronService {
         return { success: false, error: `This transaction was not sent to our deposit address. Expected: ${hotWallet}, Got: ${toAddress}` };
       }
 
-      // 7. Verify it's the USDT contract
-      const txContractAddress = tronWeb.address.fromHex('41' + txInfo.contract_address);
-      if (txContractAddress.toLowerCase() !== this.usdtContract.toLowerCase()) {
+      // 7. Verify it's the USDT contract (using contract address from log)
+      logger.info(`Checking contract: got ${contractAddress}, expected ${this.usdtContract}`);
+      if (contractAddress.toLowerCase() !== this.usdtContract.toLowerCase()) {
         return { success: false, error: 'This is not a USDT transaction' };
       }
 
