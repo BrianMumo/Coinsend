@@ -2,6 +2,7 @@ import app from './app';
 import { config } from './config/env';
 import { logger } from './utils/logger';
 import { PrismaClient } from '@prisma/client';
+import { depositMonitor } from './services/depositMonitor.service';
 
 const prisma = new PrismaClient();
 
@@ -10,6 +11,9 @@ async function main() {
     // Test database connection
     await prisma.$connect();
     logger.info('Database connected successfully');
+
+    // Start deposit monitor for automatic USDT detection
+    depositMonitor.start();
 
     // Start server
     app.listen(config.port, () => {
@@ -26,12 +30,14 @@ async function main() {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Shutting down gracefully...');
+  depositMonitor.stop();
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   logger.info('Shutting down gracefully...');
+  depositMonitor.stop();
   await prisma.$disconnect();
   process.exit(0);
 });

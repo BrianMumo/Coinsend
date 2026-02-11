@@ -27,6 +27,28 @@ export interface UsdtWithdrawResponse {
   status: string;
 }
 
+export interface DepositIntentResponse {
+  intentId: string;
+  expectedAmount: number;
+  depositAddress: string;
+  network: string;
+  exchangeRate: number;
+  estimatedKes: number;
+  expiresAt: string;
+  expiresIn: string;
+}
+
+export interface PendingDepositIntent {
+  id: string;
+  expectedAmount: number;
+  estimatedKes: number;
+  exchangeRate: number;
+  depositAddress: string;
+  network: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
 export interface TransactionStatusResponse {
   id: string;
   status: string;
@@ -133,6 +155,24 @@ export const balanceApi = {
     walletAddress: string
   ): Promise<ApiResponse<UsdtWithdrawResponse>> => {
     const response = await api.post('/balance/usdt/withdraw', { amount, walletAddress });
+    return response.data;
+  },
+
+  /**
+   * Create USDT deposit intent (tells system how much USDT you're sending)
+   */
+  createDepositIntent: async (
+    amount: number
+  ): Promise<ApiResponse<DepositIntentResponse>> => {
+    const response = await api.post('/balance/usdt/deposit-intent', { amount });
+    return response.data;
+  },
+
+  /**
+   * Get pending USDT deposit intent
+   */
+  getDepositIntent: async (): Promise<ApiResponse<PendingDepositIntent | null>> => {
+    const response = await api.get('/balance/usdt/deposit-intent');
     return response.data;
   },
 };

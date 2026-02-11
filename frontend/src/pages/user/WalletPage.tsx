@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
-import { balanceApi } from '../../api/balance.api';
+import { balanceApi, DepositIntentResponse } from '../../api/balance.api';
 import { ratesApi } from '../../api/rates.api';
 import { BalanceTransaction, BalanceWithHistory } from '../../types';
 import { formatDate } from '../../utils/formatters';
@@ -19,9 +19,11 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Clock,
 } from 'lucide-react';
 
 type TabType = 'all' | 'deposits' | 'withdrawals';
+type DepositStep = 'amount' | 'address' | 'waiting';
 
 const WalletPage = () => {
   const location = useLocation();
@@ -37,13 +39,18 @@ const WalletPage = () => {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
+  // Deposit states
+  const [depositStep, setDepositStep] = useState<DepositStep>('amount');
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositIntent, setDepositIntent] = useState<DepositIntentResponse | null>(null);
+  const [copied, setCopied] = useState(false);
+
   // Form states
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawPhone, setWithdrawPhone] = useState(user?.phone || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // USDT deposit address (Coinsend's hot wallet)
   const [depositAddress, setDepositAddress] = useState<string>('');
@@ -103,6 +110,45 @@ const WalletPage = () => {
     fetchBalance();
   }, [fetchBalance]);
 
+  // Auto-refresh to check for deposits
+  useEffect(() => {
+    if (depositStep === 'waiting') {
+      const interval = setInterval(() => {
+        fetchBalance();
+      }, 10000); // Check every 10 seconds
+      return () => clearInterval(interval);
+    }
+  }, [depositStep, fetchBalance]);
+
+  const handleCreateDepositIntent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    const amount = parseFloat(depositAmount);
+    if (isNaN(amount) || amount < 1) {
+      setFormError('Minimum deposit is 1 USDT');
+      return;
+    }
+    if (amount > 100000) {
+      setFormError('Maximum deposit is 100,000 USDT');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const response = await balanceApi.createDepositIntent(amount);
+      if (response.success && response.data) {
+        setDepositIntent(response.data);
+        setDepositStep('address');
+      }
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: { message?: string } } } };
+      setFormError(error.response?.data?.error?.message || 'Failed to create deposit intent');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -149,11 +195,20 @@ const WalletPage = () => {
   };
 
   const copyAddress = async () => {
-    if (depositAddress) {
-      await navigator.clipboard.writeText(depositAddress);
+    const address = depositIntent?.depositAddress || depositAddress;
+    if (address) {
+      await navigator.clipboard.writeText(address);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const closeDepositModal = () => {
+    setShowDepositModal(false);
+    setDepositStep('amount');
+    setDepositAmount('');
+    setDepositIntent(null);
+    setFormError(null);
   };
 
   const getTransactionIcon = (type: string) => {
@@ -359,75 +414,172 @@ const WalletPage = () => {
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 max-h-[85vh] overflow-y-auto animate-slide-up">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold">Deposit USDT</h2>
+              <h2 className="text-lg font-bold">
+                {depositStep === 'amount' && 'Deposit USDT'}
+                {depositStep === 'address' && 'Send USDT'}
+                {depositStep === 'waiting' && 'Waiting for Deposit'}
+              </h2>
               <button
-                onClick={() => setShowDepositModal(false)}
+                onClick={closeDepositModal}
                 className="p-2 hover:bg-gray-100 rounded-full"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="space-y-4">
-              {/* Rate info */}
-              {usdtRate > 0 && (
-                <div className="bg-green-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-green-600 mb-1">Current Rate</p>
-                  <p className="text-xl font-bold text-green-800">
-                    1 USDT = KES {usdtRate.toLocaleString()}
-                  </p>
-                </div>
-              )}
+            {/* Step 1: Enter Amount */}
+            {depositStep === 'amount' && (
+              <form onSubmit={handleCreateDepositIntent} className="space-y-4">
+                {formError && <Alert variant="error" className="text-sm">{formError}</Alert>}
 
-              {/* Deposit Address */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Send USDT (TRC-20) to:
-                </label>
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <code className="text-xs break-all font-mono text-gray-800 flex-1">
-                      {depositAddress || 'Loading...'}
-                    </code>
-                    <button
-                      onClick={copyAddress}
-                      className="p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0"
-                    >
-                      {copied ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <Copy className="h-5 w-5 text-gray-500" />
-                      )}
-                    </button>
+                {/* Rate info */}
+                {usdtRate > 0 && (
+                  <div className="bg-green-50 rounded-xl p-4 text-center">
+                    <p className="text-xs text-green-600 mb-1">Current Rate</p>
+                    <p className="text-xl font-bold text-green-800">
+                      1 USDT = KES {usdtRate.toLocaleString()}
+                    </p>
+                  </div>
+                )}
+
+                <Input
+                  label="Amount (USDT)"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  placeholder="Enter USDT amount"
+                  required
+                  disabled={isSubmitting}
+                />
+
+                {depositAmount && parseFloat(depositAmount) > 0 && (
+                  <div className="bg-gray-50 rounded-xl p-3 text-center">
+                    <p className="text-xs text-gray-500">You will receive approximately</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      KES {(parseFloat(depositAmount) * usdtRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  isLoading={isSubmitting}
+                >
+                  Continue
+                </Button>
+              </form>
+            )}
+
+            {/* Step 2: Show Address */}
+            {depositStep === 'address' && depositIntent && (
+              <div className="space-y-4">
+                {/* Summary */}
+                <div className="bg-green-50 rounded-xl p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-green-600">You send</span>
+                    <span className="font-bold text-green-800">{depositIntent.expectedAmount} USDT</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-green-600">You receive</span>
+                    <span className="font-bold text-green-800">
+                      KES {depositIntent.estimatedKes.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Network Warning */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                <p className="text-xs text-yellow-800">
-                  <strong>⚠️ TRON Network Only</strong> - Sending from other networks will result in loss of funds.
+                {/* Deposit Address */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Send exactly {depositIntent.expectedAmount} USDT to:
+                  </label>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <code className="text-xs break-all font-mono text-gray-800 flex-1">
+                        {depositIntent.depositAddress}
+                      </code>
+                      <button
+                        onClick={copyAddress}
+                        className="p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0"
+                      >
+                        {copied ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <Copy className="h-5 w-5 text-gray-500" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timer */}
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Clock className="h-4 w-4" />
+                  <span>Expires in 1 hour</span>
+                </div>
+
+                {/* Network Warning */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                  <p className="text-xs text-yellow-800">
+                    <strong>⚠️ TRON Network Only</strong> - Send USDT on TRC-20 network only.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setDepositStep('amount')}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    onClick={() => setDepositStep('waiting')}
+                  >
+                    I've Sent It
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Waiting */}
+            {depositStep === 'waiting' && depositIntent && (
+              <div className="space-y-4 text-center">
+                <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
+                  <RefreshCw className="h-8 w-8 text-blue-600 animate-spin" />
+                </div>
+
+                <div>
+                  <p className="font-medium text-gray-900">Waiting for your deposit...</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    We're monitoring for {depositIntent.expectedAmount} USDT
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-4 text-left">
+                  <p className="text-xs font-medium text-gray-500 mb-2">DEPOSIT ADDRESS</p>
+                  <code className="text-xs break-all font-mono text-gray-800">
+                    {depositIntent.depositAddress}
+                  </code>
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  Once we detect your deposit, your balance will update automatically.
+                  This page refreshes every 10 seconds.
                 </p>
-              </div>
 
-              {/* Steps */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-medium text-gray-500 mb-2">HOW IT WORKS</p>
-                <ol className="text-sm text-gray-700 space-y-1.5">
-                  <li>1. Send USDT to the address above</li>
-                  <li>2. We convert at the current rate</li>
-                  <li>3. KES credited to your balance</li>
-                </ol>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={closeDepositModal}
+                >
+                  Close
+                </Button>
               </div>
-
-              <Button
-                onClick={() => setShowDepositModal(false)}
-                className="w-full"
-                variant="outline"
-              >
-                Done
-              </Button>
-            </div>
+            )}
           </div>
         </div>
       )}

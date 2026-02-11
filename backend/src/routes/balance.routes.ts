@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validator';
 import { asyncHandler } from '../middleware/errorHandler';
 import { balanceService } from '../services/balance.service';
+import { tronService } from '../services/tron.service';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -50,6 +51,12 @@ const usdtWithdrawValidation = [
     .withMessage('Wallet address is required')
     .isLength({ min: 30, max: 50 })
     .withMessage('Invalid TRON wallet address'),
+];
+
+const usdtDepositIntentValidation = [
+  body('amount')
+    .isFloat({ min: 1, max: 100000 })
+    .withMessage('Amount must be between 1 and 100,000 USDT'),
 ];
 
 /**
@@ -270,6 +277,75 @@ router.post(
         amount: result.transaction.amount,
         txHash: result.txHash,
         status: result.transaction.status,
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/balance/usdt/deposit-intent
+ * Create a deposit intent (user declares they're sending X USDT)
+ * This helps match incoming deposits to users
+ */
+router.post(
+  '/usdt/deposit-intent',
+  validate(usdtDepositIntentValidation),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { amount } = req.body;
+
+    logger.info(`USDT deposit intent from user ${req.user!.userId}: Amount ${amount}`);
+
+    const result = await tronService.createDepositIntent(
+      req.user!.userId,
+      parseFloat(amount)
+    );
+
+    res.json({
+      success: true,
+      message: 'Deposit intent created. Send USDT to the address below.',
+      data: {
+        intentId: result.id,
+        expectedAmount: result.expectedAmount,
+        depositAddress: result.depositAddress,
+        network: 'TRON (TRC-20)',
+        exchangeRate: result.exchangeRate,
+        estimatedKes: result.estimatedKes,
+        expiresAt: result.expiresAt,
+        expiresIn: '1 hour',
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/balance/usdt/deposit-intent
+ * Get user's active pending deposit intent
+ */
+router.get(
+  '/usdt/deposit-intent',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const intent = await tronService.getPendingDepositIntent(req.user!.userId);
+
+    if (!intent) {
+      res.json({
+        success: true,
+        data: null,
+        message: 'No pending deposit intent',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: intent.id,
+        expectedAmount: intent.expectedAmount,
+        estimatedKes: intent.kesAmount,
+        exchangeRate: intent.exchangeRate,
+        depositAddress: tronService.getHotWalletAddress(),
+        network: 'TRON (TRC-20)',
+        expiresAt: intent.expiresAt,
+        createdAt: intent.createdAt,
       },
     });
   })

@@ -278,15 +278,114 @@ class TronService {
   }
 
   /**
-   * Try to match a deposit to a pending order
+   * Try to match a deposit to a pending deposit intent or order
    */
   private async matchDepositToOrder(
     txHash: string,
     fromAddress: string,
     amount: number
   ): Promise<void> {
-    // Find pending CRYPTO_TO_KES orders with matching amount
-    // In production, you might use unique deposit addresses per order
+    // First, try to match to pending USDT deposit intents (user-initiated)
+    const pendingDeposit = await prisma.pendingUsdtDeposit.findFirst({
+      where: {
+        status: 'PENDING',
+        expiresAt: { gt: new Date() },
+        // Match by approximate amount (within 0.5 USDT tolerance)
+        expectedAmount: {
+          gte: amount - 0.5,
+          lte: amount + 0.5,
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      include: { user: true },
+    });
+
+    if (pendingDeposit) {
+      logger.info(`Matched deposit ${txHash} to pending intent ${pendingDeposit.id} for user ${pendingDeposit.userId}`);
+
+      // Get current exchange rate
+      const rate = await prisma.exchangeRate.findFirst({
+        where: { pair: 'USDT/KES', isActive: true },
+      });
+
+      if (!rate) {
+        logger.error('No USDT/KES rate found, cannot process deposit');
+        return;
+      }
+
+      const exchangeRate = Number(rate.buyRate);
+      const kesAmount = amount * exchangeRate;
+
+      // Use transaction for atomicity
+      await prisma.$transaction(async (tx) => {
+        // Update the pending deposit as matched
+        await tx.pendingUsdtDeposit.update({
+          where: { id: pendingDeposit.id },
+          data: {
+            status: 'MATCHED',
+            matchedTxHash: txHash,
+            matchedAmount: amount,
+            kesAmount,
+            exchangeRate,
+            matchedAt: new Date(),
+          },
+        });
+
+        // Get or create user balance
+        let userBalance = await tx.userBalance.findUnique({
+          where: { userId: pendingDeposit.userId },
+        });
+
+        if (!userBalance) {
+          userBalance = await tx.userBalance.create({
+            data: {
+              userId: pendingDeposit.userId,
+              balance: 0,
+              usdtBalance: 0,
+              currency: 'KES',
+            },
+          });
+        }
+
+        const currentKesBalance = Number(userBalance.balance);
+        const newKesBalance = currentKesBalance + kesAmount;
+
+        // Credit KES balance
+        await tx.userBalance.update({
+          where: { userId: pendingDeposit.userId },
+          data: { balance: newKesBalance },
+        });
+
+        // Create balance transaction record
+        await tx.balanceTransaction.create({
+          data: {
+            userBalanceId: userBalance.id,
+            type: 'USDT_DEPOSIT',
+            status: 'COMPLETED',
+            currency: 'KES',
+            amount: kesAmount,
+            balanceBefore: currentKesBalance,
+            balanceAfter: newKesBalance,
+            txHash,
+            walletAddress: fromAddress,
+            reference: txHash,
+            description: `USDT deposit: ${amount} USDT → KES ${kesAmount.toFixed(2)} @ ${exchangeRate}`,
+            completedAt: new Date(),
+          },
+        });
+
+        // Link crypto transaction
+        await tx.cryptoTransaction.update({
+          where: { txHash },
+          data: { status: 'COMPLETED' },
+        });
+      });
+
+      logger.info(`Credited KES ${kesAmount.toFixed(2)} to user ${pendingDeposit.userId} from ${amount} USDT deposit`);
+      return;
+    }
+
+    // Fallback: try to match to pending CRYPTO_TO_KES orders
     const pendingOrder = await prisma.order.findFirst({
       where: {
         orderType: 'CRYPTO_TO_KES',
@@ -324,7 +423,120 @@ class TronService {
           status: 'COMPLETED',
         },
       });
+    } else {
+      logger.warn(`Unmatched deposit: ${amount} USDT from ${fromAddress}, txHash: ${txHash}`);
     }
+  }
+
+  /**
+   * Create a pending deposit intent for a user
+   */
+  async createDepositIntent(
+    userId: string,
+    expectedAmount: number
+  ): Promise<{ id: string; expectedAmount: number; expiresAt: Date; depositAddress: string; exchangeRate: number; estimatedKes: number }> {
+    // Validate amount
+    if (expectedAmount < 1) {
+      throw new Error('Minimum deposit is 1 USDT');
+    }
+    if (expectedAmount > 100000) {
+      throw new Error('Maximum deposit is 100,000 USDT');
+    }
+
+    // Get current exchange rate
+    const rate = await prisma.exchangeRate.findFirst({
+      where: { pair: 'USDT/KES', isActive: true },
+    });
+
+    if (!rate) {
+      throw new Error('Exchange rate not available');
+    }
+
+    const exchangeRate = Number(rate.buyRate);
+    const estimatedKes = expectedAmount * exchangeRate;
+
+    // Expire any existing pending intents for this user
+    await prisma.pendingUsdtDeposit.updateMany({
+      where: {
+        userId,
+        status: 'PENDING',
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    // Create new pending deposit intent (expires in 1 hour)
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    const intent = await prisma.pendingUsdtDeposit.create({
+      data: {
+        userId,
+        expectedAmount,
+        exchangeRate,
+        kesAmount: estimatedKes,
+        expiresAt,
+      },
+    });
+
+    logger.info(`Created deposit intent for user ${userId}: ${expectedAmount} USDT, expected KES ${estimatedKes.toFixed(2)}`);
+
+    return {
+      id: intent.id,
+      expectedAmount,
+      expiresAt,
+      depositAddress: this.getHotWalletAddress(),
+      exchangeRate,
+      estimatedKes,
+    };
+  }
+
+  /**
+   * Get user's pending deposit intent
+   */
+  async getPendingDepositIntent(userId: string) {
+    const intent = await prisma.pendingUsdtDeposit.findFirst({
+      where: {
+        userId,
+        status: 'PENDING',
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!intent) {
+      return null;
+    }
+
+    return {
+      id: intent.id,
+      expectedAmount: Number(intent.expectedAmount),
+      kesAmount: Number(intent.kesAmount),
+      exchangeRate: Number(intent.exchangeRate),
+      expiresAt: intent.expiresAt,
+      createdAt: intent.createdAt,
+    };
+  }
+
+  /**
+   * Clean up expired deposit intents
+   */
+  async cleanupExpiredIntents(): Promise<number> {
+    const result = await prisma.pendingUsdtDeposit.updateMany({
+      where: {
+        status: 'PENDING',
+        expiresAt: { lt: new Date() },
+      },
+      data: {
+        status: 'EXPIRED',
+      },
+    });
+
+    if (result.count > 0) {
+      logger.info(`Expired ${result.count} pending deposit intents`);
+    }
+
+    return result.count;
   }
 
   /**

@@ -102,8 +102,9 @@ model User {
   updatedAt     DateTime   @updatedAt
   lastLoginAt   DateTime?
 
-  orders        Order[]
-  balance       UserBalance?
+  orders              Order[]
+  balance             UserBalance?
+  pendingUsdtDeposits PendingUsdtDeposit[]
 
   @@index([email])
   @@index([phone])
@@ -394,4 +395,39 @@ model SystemConfig {
   key             String                    @id
   value           String
   updatedAt       DateTime                  @updatedAt
+}
+
+// ============ PENDING USDT DEPOSITS ============
+// Tracks user-initiated deposit intents for amount-based matching
+
+enum PendingDepositStatus {
+  PENDING       // Waiting for deposit
+  MATCHED       // Deposit detected and matched
+  EXPIRED       // No deposit received within window
+  CANCELLED     // User cancelled
+}
+
+model PendingUsdtDeposit {
+  id              String                    @id @default(uuid())
+  userId          String
+  expectedAmount  Decimal                   @db.Decimal(18, 6)  // USDT amount user said they're sending
+  kesAmount       Decimal?                  @db.Decimal(18, 2)  // KES to credit (calculated at current rate)
+  exchangeRate    Decimal?                  @db.Decimal(18, 8)  // Rate at time of intent
+  status          PendingDepositStatus      @default(PENDING)
+
+  // Matching info
+  matchedTxHash   String?                   // TX hash when matched
+  matchedAmount   Decimal?                  @db.Decimal(18, 6)  // Actual amount received
+  matchedAt       DateTime?
+
+  // Timestamps
+  createdAt       DateTime                  @default(now())
+  expiresAt       DateTime                  // Intent expires after 1 hour
+
+  user            User                      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([expectedAmount])
+  @@index([expiresAt])
 }
