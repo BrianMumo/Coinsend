@@ -586,6 +586,180 @@ class TronService {
   }
 
   /**
+   * Verify a USDT deposit transaction and credit user's balance
+   * User submits their transaction hash for verification
+   */
+  async verifyAndCreditDeposit(
+    userId: string,
+    txHash: string
+  ): Promise<{ success: boolean; amount?: number; kesAmount?: number; error?: string }> {
+    const tronWeb = this.getTronWeb();
+    const hotWallet = this.getHotWalletAddress();
+
+    try {
+      // 1. Check if this transaction was already processed
+      const existingTx = await prisma.cryptoTransaction.findUnique({
+        where: { txHash },
+      });
+
+      if (existingTx) {
+        if (existingTx.status === 'COMPLETED') {
+          return { success: false, error: 'This transaction has already been credited' };
+        }
+        // If pending, continue to verify
+      }
+
+      // 2. Check if this txHash was already claimed by another user
+      const existingClaim = await prisma.balanceTransaction.findFirst({
+        where: { txHash },
+      });
+
+      if (existingClaim) {
+        return { success: false, error: 'This transaction has already been claimed' };
+      }
+
+      // 3. Fetch transaction info from TRON blockchain
+      logger.info(`Verifying transaction ${txHash} for user ${userId}`);
+
+      const txInfo = await tronWeb.trx.getTransactionInfo(txHash);
+
+      if (!txInfo || !txInfo.id) {
+        return { success: false, error: 'Transaction not found on blockchain. Please wait a few minutes and try again.' };
+      }
+
+      // 4. Check if transaction was successful
+      if (txInfo.receipt?.result !== 'SUCCESS') {
+        return { success: false, error: 'Transaction failed on blockchain' };
+      }
+
+      // 5. Parse the TRC-20 transfer event logs
+      const logs = txInfo.log || [];
+      let transferAmount = 0;
+      let toAddress = '';
+      let fromAddress = '';
+
+      for (const log of logs) {
+        // Transfer event topic: keccak256("Transfer(address,address,uint256)")
+        if (log.topics && log.topics[0] === 'ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef') {
+          // Decode from address (topic[1])
+          fromAddress = tronWeb.address.fromHex('41' + log.topics[1].slice(24));
+          // Decode to address (topic[2])
+          toAddress = tronWeb.address.fromHex('41' + log.topics[2].slice(24));
+          // Decode amount from data (6 decimals for USDT)
+          transferAmount = parseInt(log.data, 16) / 1_000_000;
+        }
+      }
+
+      if (transferAmount === 0) {
+        return { success: false, error: 'Could not parse USDT transfer from transaction' };
+      }
+
+      // 6. Verify the transfer was TO our hot wallet
+      if (toAddress.toLowerCase() !== hotWallet.toLowerCase()) {
+        return { success: false, error: `This transaction was not sent to our deposit address. Expected: ${hotWallet}, Got: ${toAddress}` };
+      }
+
+      // 7. Verify it's the USDT contract
+      const txContractAddress = tronWeb.address.fromHex('41' + txInfo.contract_address);
+      if (txContractAddress.toLowerCase() !== this.usdtContract.toLowerCase()) {
+        return { success: false, error: 'This is not a USDT transaction' };
+      }
+
+      // 8. Get exchange rate and calculate KES
+      const rate = await prisma.exchangeRate.findFirst({
+        where: { pair: 'USDT_KES', isActive: true },
+      });
+
+      if (!rate) {
+        return { success: false, error: 'Exchange rate not available' };
+      }
+
+      const exchangeRate = Number(rate.buyRate);
+      const kesAmount = transferAmount * exchangeRate;
+
+      // 9. Credit user's balance (atomic transaction)
+      await prisma.$transaction(async (tx) => {
+        // Get or create user balance
+        let userBalance = await tx.userBalance.findUnique({
+          where: { userId },
+        });
+
+        if (!userBalance) {
+          userBalance = await tx.userBalance.create({
+            data: {
+              userId,
+              balance: 0,
+              usdtBalance: 0,
+              currency: 'KES',
+            },
+          });
+        }
+
+        const currentKesBalance = Number(userBalance.balance);
+        const newKesBalance = currentKesBalance + kesAmount;
+
+        // Credit KES balance
+        await tx.userBalance.update({
+          where: { userId },
+          data: { balance: newKesBalance },
+        });
+
+        // Create balance transaction record
+        await tx.balanceTransaction.create({
+          data: {
+            userBalanceId: userBalance.id,
+            type: 'USDT_DEPOSIT',
+            status: 'COMPLETED',
+            currency: 'KES',
+            amount: kesAmount,
+            balanceBefore: currentKesBalance,
+            balanceAfter: newKesBalance,
+            txHash,
+            walletAddress: fromAddress,
+            reference: txHash,
+            description: `USDT deposit: ${transferAmount} USDT → KES ${kesAmount.toFixed(2)} @ ${exchangeRate}`,
+            completedAt: new Date(),
+          },
+        });
+
+        // Record crypto transaction
+        await tx.cryptoTransaction.upsert({
+          where: { txHash },
+          update: {
+            status: 'COMPLETED',
+            confirmedAt: new Date(),
+          },
+          create: {
+            type: 'DEPOSIT',
+            status: 'COMPLETED',
+            currency: 'USDT',
+            network: 'TRON',
+            txHash,
+            fromAddress,
+            toAddress: hotWallet,
+            amount: transferAmount,
+            blockNumber: BigInt(txInfo.blockNumber),
+            confirmations: 19,
+            confirmedAt: new Date(),
+            notes: `Verified deposit: ${transferAmount} USDT from ${fromAddress}`,
+          },
+        });
+      });
+
+      logger.info(`Successfully credited ${kesAmount.toFixed(2)} KES to user ${userId} from ${transferAmount} USDT deposit (tx: ${txHash})`);
+
+      return {
+        success: true,
+        amount: transferAmount,
+        kesAmount,
+      };
+    } catch (error: any) {
+      logger.error(`Failed to verify deposit ${txHash}:`, error.message);
+      return { success: false, error: error.message || 'Failed to verify transaction' };
+    }
+  }
+
+  /**
    * Validate a TRON address
    */
   isValidAddress(address: string): boolean {

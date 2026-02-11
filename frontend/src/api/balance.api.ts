@@ -175,4 +175,15 @@ export const balanceApi = {
     const response = await api.get('/balance/usdt/deposit-intent');
     return response.data;
   },
+
+  /**
+   * Verify USDT deposit using transaction hash
+   * This is the primary method for crediting USDT deposits
+   */
+  verifyDeposit: async (
+    txHash: string
+  ): Promise<ApiResponse<{ usdtAmount: number; kesAmount: number; txHash: string }>> => {
+    const response = await api.post('/balance/usdt/verify-deposit', { txHash });
+    return response.data;
+  },
 };

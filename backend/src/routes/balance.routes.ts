@@ -59,6 +59,14 @@ const usdtDepositIntentValidation = [
     .withMessage('Amount must be between 1 and 100,000 USDT'),
 ];
 
+const verifyDepositValidation = [
+  body('txHash')
+    .notEmpty()
+    .withMessage('Transaction hash is required')
+    .isLength({ min: 64, max: 66 })
+    .withMessage('Invalid transaction hash format'),
+];
+
 /**
  * GET /api/balance
  * Get user's balance and recent transactions
@@ -346,6 +354,44 @@ router.get(
         network: 'TRON (TRC-20)',
         expiresAt: intent.expiresAt,
         createdAt: intent.createdAt,
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/balance/usdt/verify-deposit
+ * User submits their transaction hash to verify and credit their deposit
+ * This is the PRIMARY method for crediting USDT deposits
+ */
+router.post(
+  '/usdt/verify-deposit',
+  validate(verifyDepositValidation),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { txHash } = req.body;
+
+    logger.info(`Deposit verification request from user ${req.user!.userId}: txHash ${txHash}`);
+
+    const result = await tronService.verifyAndCreditDeposit(
+      req.user!.userId,
+      txHash.trim()
+    );
+
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        error: { message: result.error },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully credited ${result.kesAmount?.toFixed(2)} KES from ${result.amount} USDT deposit`,
+      data: {
+        usdtAmount: result.amount,
+        kesAmount: result.kesAmount,
+        txHash,
       },
     });
   })

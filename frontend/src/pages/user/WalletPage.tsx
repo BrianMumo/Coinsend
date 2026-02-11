@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 type TabType = 'all' | 'deposits' | 'withdrawals';
-type DepositStep = 'amount' | 'address' | 'waiting';
+type DepositStep = 'info' | 'verify' | 'success';
 
 const WalletPage = () => {
   const location = useLocation();
@@ -40,9 +40,9 @@ const WalletPage = () => {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   // Deposit states
-  const [depositStep, setDepositStep] = useState<DepositStep>('amount');
-  const [depositAmount, setDepositAmount] = useState('');
-  const [depositIntent, setDepositIntent] = useState<DepositIntentResponse | null>(null);
+  const [depositStep, setDepositStep] = useState<DepositStep>('info');
+  const [depositTxHash, setDepositTxHash] = useState('');
+  const [depositResult, setDepositResult] = useState<{ usdtAmount: number; kesAmount: number } | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Form states
@@ -110,40 +110,35 @@ const WalletPage = () => {
     fetchBalance();
   }, [fetchBalance]);
 
-  // Auto-refresh to check for deposits
-  useEffect(() => {
-    if (depositStep === 'waiting') {
-      const interval = setInterval(() => {
-        fetchBalance();
-      }, 10000); // Check every 10 seconds
-      return () => clearInterval(interval);
-    }
-  }, [depositStep, fetchBalance]);
-
-  const handleCreateDepositIntent = async (e: React.FormEvent) => {
+  const handleVerifyDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    const amount = parseFloat(depositAmount);
-    if (isNaN(amount) || amount < 1) {
-      setFormError('Minimum deposit is 1 USDT');
+    const txHash = depositTxHash.trim();
+    if (!txHash) {
+      setFormError('Please enter your transaction hash');
       return;
     }
-    if (amount > 100000) {
-      setFormError('Maximum deposit is 100,000 USDT');
+    if (txHash.length < 64) {
+      setFormError('Invalid transaction hash format');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const response = await balanceApi.createDepositIntent(amount);
+      const response = await balanceApi.verifyDeposit(txHash);
       if (response.success && response.data) {
-        setDepositIntent(response.data);
-        setDepositStep('address');
+        setDepositResult({
+          usdtAmount: response.data.usdtAmount,
+          kesAmount: response.data.kesAmount,
+        });
+        setDepositStep('success');
+        // Refresh balance
+        fetchBalance();
       }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: { message?: string } } } };
-      setFormError(error.response?.data?.error?.message || 'Failed to create deposit intent');
+      setFormError(error.response?.data?.error?.message || 'Failed to verify deposit');
     } finally {
       setIsSubmitting(false);
     }
@@ -194,10 +189,10 @@ const WalletPage = () => {
     }
   };
 
-  const copyAddress = async () => {
-    const address = depositIntent?.depositAddress || depositAddress;
-    if (address) {
-      await navigator.clipboard.writeText(address);
+  const copyAddress = async (address?: string) => {
+    const addressToCopy = address || depositAddress;
+    if (addressToCopy) {
+      await navigator.clipboard.writeText(addressToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -205,9 +200,9 @@ const WalletPage = () => {
 
   const closeDepositModal = () => {
     setShowDepositModal(false);
-    setDepositStep('amount');
-    setDepositAmount('');
-    setDepositIntent(null);
+    setDepositStep('info');
+    setDepositTxHash('');
+    setDepositResult(null);
     setFormError(null);
   };
 
@@ -415,9 +410,9 @@ const WalletPage = () => {
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 max-h-[85vh] overflow-y-auto animate-slide-up">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold">
-                {depositStep === 'amount' && 'Deposit USDT'}
-                {depositStep === 'address' && 'Send USDT'}
-                {depositStep === 'waiting' && 'Waiting for Deposit'}
+                {depositStep === 'info' && 'Deposit USDT'}
+                {depositStep === 'verify' && 'Verify Deposit'}
+                {depositStep === 'success' && 'Deposit Successful'}
               </h2>
               <button
                 onClick={closeDepositModal}
@@ -427,9 +422,9 @@ const WalletPage = () => {
               </button>
             </div>
 
-            {/* Step 1: Enter Amount */}
-            {depositStep === 'amount' && (
-              <form onSubmit={handleCreateDepositIntent} className="space-y-4">
+            {/* Step 1: Show Address & Instructions */}
+            {depositStep === 'info' && (
+              <div className="space-y-4">
                 {formError && <Alert variant="error" className="text-sm">{formError}</Alert>}
 
                 {/* Rate info */}
@@ -442,73 +437,18 @@ const WalletPage = () => {
                   </div>
                 )}
 
-                <Input
-                  label="Amount (USDT)"
-                  type="number"
-                  min="1"
-                  step="0.01"
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  placeholder="Enter USDT amount"
-                  required
-                  disabled={isSubmitting}
-                />
-
-                {depositAmount && parseFloat(depositAmount) > 0 && (
-                  <div className="bg-gray-50 rounded-xl p-3 text-center">
-                    <p className="text-xs text-gray-500">You will receive approximately</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      KES {(parseFloat(depositAmount) * usdtRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </p>
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  className="w-full bg-green-600 hover:bg-green-700"
-                  isLoading={isSubmitting}
-                >
-                  Continue
-                </Button>
-              </form>
-            )}
-
-            {/* Step 2: Show Address */}
-            {depositStep === 'address' && depositIntent && (
-              <div className="space-y-4">
-                {/* IMPORTANT: Exact Amount Box */}
-                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-center">
-                  <p className="text-xs text-red-600 font-medium mb-1">⚠️ SEND EXACTLY THIS AMOUNT</p>
-                  <p className="text-2xl font-bold text-red-700">
-                    {depositIntent.expectedAmount.toFixed(4)} USDT
-                  </p>
-                  <p className="text-xs text-red-500 mt-1">
-                    The decimals are unique to your deposit. Sending a different amount will not be credited.
-                  </p>
-                </div>
-
-                {/* Summary */}
-                <div className="bg-green-50 rounded-xl p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-green-600">You will receive</span>
-                    <span className="font-bold text-green-800">
-                      KES {depositIntent.estimatedKes.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </span>
-                  </div>
-                </div>
-
                 {/* Deposit Address */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Deposit Address (TRC-20):
+                    Send USDT (TRC-20) to:
                   </label>
                   <div className="bg-gray-50 rounded-xl p-3">
                     <div className="flex items-center justify-between gap-2">
                       <code className="text-xs break-all font-mono text-gray-800 flex-1">
-                        {depositIntent.depositAddress}
+                        {depositAddress || 'Loading...'}
                       </code>
                       <button
-                        onClick={copyAddress}
+                        onClick={() => copyAddress(depositAddress)}
                         className="p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0"
                       >
                         {copied ? (
@@ -521,69 +461,110 @@ const WalletPage = () => {
                   </div>
                 </div>
 
-                {/* Timer */}
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Clock className="h-4 w-4" />
-                  <span>Expires in 1 hour</span>
+                {/* Instructions */}
+                <div className="bg-blue-50 rounded-xl p-4">
+                  <p className="text-sm font-medium text-blue-800 mb-2">How to deposit:</p>
+                  <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                    <li>Send any amount of USDT to the address above</li>
+                    <li>Wait for the transaction to confirm</li>
+                    <li>Copy your transaction hash from your wallet</li>
+                    <li>Click "I've Sent USDT" and paste your transaction hash</li>
+                  </ol>
                 </div>
 
                 {/* Network Warning */}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
                   <p className="text-xs text-yellow-800">
-                    <strong>⚠️ TRON Network Only</strong> - Send USDT on TRC-20 network only. Other networks will not be detected.
+                    <strong>⚠️ TRON Network Only</strong> - Send USDT on TRC-20 network only. Other networks will not be credited.
                   </p>
                 </div>
+
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  onClick={() => setDepositStep('verify')}
+                >
+                  I've Sent USDT
+                </Button>
+              </div>
+            )}
+
+            {/* Step 2: Enter Transaction Hash */}
+            {depositStep === 'verify' && (
+              <form onSubmit={handleVerifyDeposit} className="space-y-4">
+                {formError && <Alert variant="error" className="text-sm">{formError}</Alert>}
+
+                <div className="bg-gray-50 rounded-xl p-4 text-center">
+                  <p className="text-sm text-gray-600">
+                    Enter your TRON transaction hash to verify your deposit
+                  </p>
+                </div>
+
+                <Input
+                  label="Transaction Hash"
+                  type="text"
+                  value={depositTxHash}
+                  onChange={(e) => setDepositTxHash(e.target.value)}
+                  placeholder="e.g., a1b2c3d4e5f6..."
+                  required
+                  disabled={isSubmitting}
+                />
+
+                <p className="text-xs text-gray-500">
+                  You can find this in your wallet's transaction history or on TronScan.
+                </p>
 
                 <div className="flex gap-3">
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() => setDepositStep('amount')}
+                    onClick={() => { setDepositStep('info'); setFormError(null); }}
+                    disabled={isSubmitting}
                   >
                     Back
                   </Button>
                   <Button
+                    type="submit"
                     className="flex-1 bg-green-600 hover:bg-green-700"
-                    onClick={() => setDepositStep('waiting')}
+                    isLoading={isSubmitting}
                   >
-                    I've Sent It
+                    Verify & Credit
                   </Button>
                 </div>
-              </div>
+              </form>
             )}
 
-            {/* Step 3: Waiting */}
-            {depositStep === 'waiting' && depositIntent && (
+            {/* Step 3: Success */}
+            {depositStep === 'success' && depositResult && (
               <div className="space-y-4 text-center">
-                <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
-                  <RefreshCw className="h-8 w-8 text-blue-600 animate-spin" />
+                <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="h-8 w-8 text-green-600" />
                 </div>
 
                 <div>
-                  <p className="font-medium text-gray-900">Waiting for your deposit...</p>
+                  <p className="font-medium text-gray-900">Deposit Successful!</p>
                   <p className="text-sm text-gray-500 mt-1">
-                    We're monitoring for exactly <strong>{depositIntent.expectedAmount.toFixed(4)} USDT</strong>
+                    Your balance has been credited
                   </p>
                 </div>
 
-                <div className="bg-gray-50 rounded-xl p-4 text-left">
-                  <p className="text-xs font-medium text-gray-500 mb-2">DEPOSIT ADDRESS</p>
-                  <code className="text-xs break-all font-mono text-gray-800">
-                    {depositIntent.depositAddress}
-                  </code>
+                <div className="bg-green-50 rounded-xl p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-green-600">USDT Deposited</span>
+                    <span className="font-bold text-green-800">{depositResult.usdtAmount} USDT</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-green-600">KES Credited</span>
+                    <span className="font-bold text-green-800">
+                      KES {depositResult.kesAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
 
-                <p className="text-xs text-gray-500">
-                  Once we detect your deposit, your balance will update automatically.
-                  This page refreshes every 10 seconds.
-                </p>
-
                 <Button
-                  variant="outline"
-                  className="w-full"
+                  className="w-full bg-green-600 hover:bg-green-700"
                   onClick={closeDepositModal}
                 >
-                  Close
+                  Done
                 </Button>
               </div>
             )}
