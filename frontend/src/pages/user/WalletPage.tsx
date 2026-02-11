@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
 import { Alert } from '../../components/ui/Alert';
-import { balanceApi, DepositIntentResponse } from '../../api/balance.api';
+import { balanceApi } from '../../api/balance.api';
 import { ratesApi } from '../../api/rates.api';
 import { BalanceTransaction, BalanceWithHistory } from '../../types';
 import { formatDate } from '../../utils/formatters';
@@ -19,7 +19,6 @@ import {
   Copy,
   Eye,
   EyeOff,
-  Clock,
 } from 'lucide-react';
 
 type TabType = 'all' | 'deposits' | 'withdrawals';
