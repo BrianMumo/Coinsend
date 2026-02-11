@@ -93,7 +93,7 @@ const WalletPage = () => {
 
       if (ratesResponse.success && ratesResponse.data) {
         const rates = ratesResponse.data.rates || ratesResponse.data;
-        const usdtKes = Array.isArray(rates) ? rates.find((r: { pair: string; buyRate: string | number }) => r.pair === 'USDT/KES') : null;
+        const usdtKes = Array.isArray(rates) ? rates.find((r: { pair: string; buyRate: string | number }) => r.pair === 'USDT_KES') : null;
         if (usdtKes) {
           setUsdtRate(parseFloat(usdtKes.buyRate.toString()));
         }
