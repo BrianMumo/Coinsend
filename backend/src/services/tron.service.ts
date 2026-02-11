@@ -305,7 +305,7 @@ class TronService {
 
       // Get current exchange rate
       const rate = await prisma.exchangeRate.findFirst({
-        where: { pair: 'USDT/KES', isActive: true },
+        where: { pair: 'USDT_KES', isActive: true },
       });
 
       if (!rate) {
@@ -445,7 +445,7 @@ class TronService {
 
     // Get current exchange rate
     const rate = await prisma.exchangeRate.findFirst({
-      where: { pair: 'USDT/KES', isActive: true },
+      where: { pair: 'USDT_KES', isActive: true },
     });
 
     if (!rate) {
