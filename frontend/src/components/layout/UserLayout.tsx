@@ -5,7 +5,6 @@ import { Header } from './Header';
 import {
   LayoutDashboard,
   Receipt,
-  PlusCircle,
   User,
   LogOut,
   MessageCircle,
@@ -23,7 +22,6 @@ interface UserLayoutProps {
 const sidebarLinks = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/wallet', icon: Wallet, label: 'Wallet' },
-  { to: '/orders/new', icon: PlusCircle, label: 'New Order' },
   { to: '/orders', icon: Receipt, label: 'My Orders' },
   { to: '/profile', icon: User, label: 'Profile' },
 ];

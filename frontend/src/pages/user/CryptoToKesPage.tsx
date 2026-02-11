@@ -6,17 +6,14 @@ import { z } from 'zod';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
 import { Alert } from '../../components/ui/Alert';
 import { PageTitle } from '../../components/ui/PageTitle';
 import { ordersApi } from '../../api/orders.api';
 import { ratesApi } from '../../api/rates.api';
-import { CRYPTO_CURRENCIES } from '../../utils/constants';
 import { formatCurrency } from '../../utils/formatters';
 import { ArrowDown, Calculator } from 'lucide-react';
 
 const formSchema = z.object({
-  sourceCurrency: z.string().min(1, 'Please select a currency'),
   sourceAmount: z.string().min(1, 'Please enter an amount').refine(
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     'Amount must be greater than 0'
@@ -45,20 +42,17 @@ const CryptoToKesPage = () => {
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      sourceCurrency: 'USDT',
       sourceAmount: '',
       payoutDestination: '',
     },
   });
 
-  const sourceCurrency = watch('sourceCurrency');
   const sourceAmount = watch('sourceAmount');
 
-  // Calculate rate when amount or currency changes
   useEffect(() => {
     const calculateRate = async () => {
       const amount = parseFloat(sourceAmount);
-      if (!amount || amount <= 0 || !sourceCurrency) {
+      if (!amount || amount <= 0) {
         setCalculation(null);
         return;
       }
@@ -66,7 +60,7 @@ const CryptoToKesPage = () => {
       setIsCalculating(true);
       try {
         const response = await ratesApi.calculate({
-          sourceCurrency,
+          sourceCurrency: 'USDT',
           destinationCurrency: 'KES',
           amount,
           direction: 'sell',
@@ -79,7 +73,7 @@ const CryptoToKesPage = () => {
             fee: response.data.fee,
           });
         }
-      } catch (err) {
+      } catch {
         setCalculation(null);
       } finally {
         setIsCalculating(false);
@@ -88,7 +82,7 @@ const CryptoToKesPage = () => {
 
     const debounce = setTimeout(calculateRate, 500);
     return () => clearTimeout(debounce);
-  }, [sourceCurrency, sourceAmount]);
+  }, [sourceAmount]);
 
   const onSubmit = async (data: FormData) => {
     setError(null);
@@ -97,7 +91,7 @@ const CryptoToKesPage = () => {
     try {
       const response = await ordersApi.create({
         orderType: 'CRYPTO_TO_KES',
-        sourceCurrency: data.sourceCurrency,
+        sourceCurrency: 'USDT',
         destinationCurrency: 'KES',
         sourceAmount: parseFloat(data.sourceAmount),
         payoutDestination: data.payoutDestination,
@@ -106,82 +100,76 @@ const CryptoToKesPage = () => {
       if (response.success && response.data) {
         navigate(`/orders/${response.data.order.id}`);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Failed to create order');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: { message?: string } } } };
+      setError(error.response?.data?.error?.message || 'Failed to create order');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-xl mx-auto">
-      <PageTitle title="Sell Crypto" description="Convert your USDT or USDC to Kenya Shillings via M-Pesa." />
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Sell Crypto for KES</h1>
-        <p className="text-gray-600">Convert your USDT or USDC to Kenya Shillings</p>
+    <div className="max-w-md mx-auto">
+      <PageTitle title="Sell USDT" description="Convert your USDT to Kenya Shillings via M-Pesa." />
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-gray-900">Sell USDT</h1>
+        <p className="text-sm text-gray-500">Convert USDT to KES</p>
       </div>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-5">
           {error && (
             <Alert variant="error" className="mb-4">
               {error}
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* You Send */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">You Send</label>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <Input
-                    type="number"
-                    step="any"
-                    placeholder="0.00"
-                    error={errors.sourceAmount?.message}
-                    {...register('sourceAmount')}
-                  />
-                </div>
-                <div className="w-32">
-                  <Select
-                    options={CRYPTO_CURRENCIES.map((c) => ({ value: c.value, label: c.label }))}
-                    {...register('sourceCurrency')}
-                  />
-                </div>
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder="0.00"
+                  className="pr-16"
+                  error={errors.sourceAmount?.message}
+                  {...register('sourceAmount')}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500">
+                  USDT
+                </span>
               </div>
             </div>
 
             {/* Arrow */}
-            <div className="flex justify-center">
-              <div className="p-2 bg-gray-100 rounded-full">
-                <ArrowDown className="h-5 w-5 text-gray-500" />
+            <div className="flex justify-center py-1">
+              <div className="p-1.5 bg-gray-100 rounded-full">
+                <ArrowDown className="h-4 w-4 text-gray-500" />
               </div>
             </div>
 
             {/* You Receive */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">You Receive</label>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 {isCalculating ? (
-                  <div className="flex items-center gap-2 text-gray-500">
+                  <div className="flex items-center gap-2 text-gray-500 text-sm">
                     <Calculator className="h-4 w-4 animate-pulse" />
                     Calculating...
                   </div>
                 ) : calculation ? (
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-xl font-bold text-green-700">
                       {formatCurrency(calculation.destinationAmount, 'KES')}
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Rate: 1 {sourceCurrency} = {calculation.exchangeRate.toFixed(2)} KES
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Fee: {formatCurrency(calculation.fee, sourceCurrency)}
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Rate: 1 USDT = {calculation.exchangeRate.toFixed(2)} KES
                     </p>
                   </div>
                 ) : (
-                  <p className="text-gray-400">Enter amount to see conversion</p>
+                  <p className="text-sm text-gray-400">Enter amount to see conversion</p>
                 )}
               </div>
             </div>
@@ -190,7 +178,7 @@ const CryptoToKesPage = () => {
             <Input
               label="M-Pesa Phone Number"
               placeholder="+254 7XX XXX XXX"
-              helperText="This is where you will receive your KES"
+              helperText="You'll receive KES here"
               error={errors.payoutDestination?.message}
               {...register('payoutDestination')}
             />
@@ -202,7 +190,7 @@ const CryptoToKesPage = () => {
               isLoading={isLoading}
               disabled={!calculation}
             >
-              Create Order
+              Sell USDT
             </Button>
           </form>
         </CardContent>

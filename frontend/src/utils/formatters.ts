@@ -1,28 +1,14 @@
 export const formatCurrency = (amount: string | number, currency: string = 'KES'): string => {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
 
-  const currencyConfig: Record<string, { locale: string; currency: string }> = {
-    KES: { locale: 'en-KE', currency: 'KES' },
-    USD: { locale: 'en-US', currency: 'USD' },
-    ZAR: { locale: 'en-ZA', currency: 'ZAR' },
-    UGX: { locale: 'en-UG', currency: 'UGX' },
-    TZS: { locale: 'en-TZ', currency: 'TZS' },
-    NGN: { locale: 'en-NG', currency: 'NGN' },
-    CNY: { locale: 'zh-CN', currency: 'CNY' },
-    AED: { locale: 'ar-AE', currency: 'AED' },
-    USDT: { locale: 'en-US', currency: 'USD' },
-    USDC: { locale: 'en-US', currency: 'USD' },
-  };
-
-  const config = currencyConfig[currency] || currencyConfig.USD;
-
-  if (['USDT', 'USDC'].includes(currency)) {
-    return `${num.toFixed(2)} ${currency}`;
+  if (currency === 'USDT') {
+    return `${num.toFixed(2)} USDT`;
   }
 
-  return new Intl.NumberFormat(config.locale, {
+  // Default to KES
+  return new Intl.NumberFormat('en-KE', {
     style: 'currency',
-    currency: config.currency,
+    currency: 'KES',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(num);
@@ -50,10 +36,8 @@ export const formatDateShort = (date: string | Date): string => {
 
 export const formatOrderType = (type: string): string => {
   const types: Record<string, string> = {
-    CRYPTO_TO_KES: 'Crypto → KES',
-    KES_TO_CRYPTO: 'KES → Crypto',
-    CROSS_BORDER: 'Cross-Border',
-    OTC: 'OTC Trade',
+    CRYPTO_TO_KES: 'Sell USDT',
+    KES_TO_CRYPTO: 'Buy USDT',
   };
   return types[type] || type;
 };

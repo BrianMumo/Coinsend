@@ -17,7 +17,6 @@ const DashboardPage = lazy(() => import('./pages/user/DashboardPage'));
 const NewOrderPage = lazy(() => import('./pages/user/NewOrderPage'));
 const CryptoToKesPage = lazy(() => import('./pages/user/CryptoToKesPage'));
 const KesToCryptoPage = lazy(() => import('./pages/user/KesToCryptoPage'));
-const CrossBorderPage = lazy(() => import('./pages/user/CrossBorderPage'));
 const OrdersPage = lazy(() => import('./pages/user/OrdersPage'));
 const OrderDetailPage = lazy(() => import('./pages/user/OrderDetailPage'));
 const ProfilePage = lazy(() => import('./pages/user/ProfilePage'));
@@ -58,7 +57,6 @@ function App() {
         <Route path="/orders/new" element={<UserLayout><NewOrderPage /></UserLayout>} />
         <Route path="/orders/new/crypto-to-kes" element={<UserLayout><CryptoToKesPage /></UserLayout>} />
         <Route path="/orders/new/kes-to-crypto" element={<UserLayout><KesToCryptoPage /></UserLayout>} />
-        <Route path="/orders/new/cross-border" element={<UserLayout><CrossBorderPage /></UserLayout>} />
         <Route path="/orders" element={<UserLayout><OrdersPage /></UserLayout>} />
         <Route path="/orders/:id" element={<UserLayout><OrderDetailPage /></UserLayout>} />
         <Route path="/wallet" element={<UserLayout><WalletPage /></UserLayout>} />
