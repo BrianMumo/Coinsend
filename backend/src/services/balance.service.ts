@@ -1,5 +1,6 @@
 import { PrismaClient, BalanceTransactionType, BalanceTransactionStatus } from '@prisma/client';
 import { mpesaService } from './mpesa.service';
+import { tronService } from './tron.service';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
 
@@ -14,6 +15,7 @@ interface BalanceWithHistory {
   balance: {
     id: string;
     balance: string;
+    usdtBalance: string;
     currency: string;
     updatedAt: Date;
   };
@@ -40,6 +42,7 @@ class BalanceService {
         data: {
           userId,
           balance: 0,
+          usdtBalance: 0,
           currency: 'KES',
         },
       });
@@ -82,6 +85,7 @@ class BalanceService {
       balance: {
         id: balance.id,
         balance: balance.balance.toString(),
+        usdtBalance: balance.usdtBalance.toString(),
         currency: balance.currency,
         updatedAt: balance.updatedAt,
       },
@@ -89,6 +93,7 @@ class BalanceService {
         id: tx.id,
         type: tx.type,
         status: tx.status,
+        currency: tx.currency,
         amount: tx.amount.toString(),
         balanceBefore: tx.balanceBefore.toString(),
         balanceAfter: tx.balanceAfter.toString(),
@@ -96,6 +101,8 @@ class BalanceService {
         orderId: tx.orderId,
         orderNumber: tx.order?.orderNumber,
         description: tx.description,
+        txHash: tx.txHash,
+        walletAddress: tx.walletAddress,
         createdAt: tx.createdAt,
         completedAt: tx.completedAt,
       })),
@@ -636,6 +643,247 @@ class BalanceService {
       reference: transaction.reference,
       createdAt: transaction.createdAt,
       completedAt: transaction.completedAt,
+    };
+  }
+
+  // ============ USDT BALANCE METHODS ============
+
+  /**
+   * Get the deposit address for USDT (shared hot wallet)
+   */
+  getUsdtDepositAddress(): string {
+    return tronService.getHotWalletAddress();
+  }
+
+  /**
+   * Credit USDT to user balance (called when deposit is detected)
+   */
+  async creditUsdt(
+    userId: string,
+    amount: number,
+    txHash: string,
+    fromAddress: string
+  ): Promise<{ transaction: any; newBalance: number }> {
+    const result = await prisma.$transaction(async (tx) => {
+      // Get or create balance
+      let balance = await tx.userBalance.findUnique({
+        where: { userId },
+      });
+
+      if (!balance) {
+        balance = await tx.userBalance.create({
+          data: {
+            userId,
+            balance: 0,
+            usdtBalance: 0,
+            currency: 'KES',
+          },
+        });
+      }
+
+      const currentBalance = Number(balance.usdtBalance);
+      const newBalance = currentBalance + amount;
+
+      // Update USDT balance
+      await tx.userBalance.update({
+        where: { userId },
+        data: { usdtBalance: newBalance },
+      });
+
+      // Create transaction record
+      const transaction = await tx.balanceTransaction.create({
+        data: {
+          userBalanceId: balance.id,
+          type: 'USDT_DEPOSIT',
+          status: 'COMPLETED',
+          currency: 'USDT',
+          amount,
+          balanceBefore: currentBalance,
+          balanceAfter: newBalance,
+          txHash,
+          walletAddress: fromAddress,
+          description: `USDT deposit from ${fromAddress.slice(0, 8)}...`,
+          completedAt: new Date(),
+        },
+      });
+
+      return { transaction, newBalance };
+    });
+
+    logger.info(`Credited ${amount} USDT to user ${userId}, txHash: ${txHash}`);
+
+    return {
+      transaction: {
+        id: result.transaction.id,
+        amount: result.transaction.amount.toString(),
+        status: result.transaction.status,
+      },
+      newBalance: result.newBalance,
+    };
+  }
+
+  /**
+   * Withdraw USDT from user balance to external wallet
+   */
+  async withdrawUsdt(
+    userId: string,
+    amount: number,
+    toAddress: string
+  ): Promise<{ transaction: any; txHash?: string }> {
+    // Validate amount
+    if (amount < 1) {
+      throw new AppError('Minimum USDT withdrawal is 1 USDT', 400);
+    }
+    if (amount > 10000) {
+      throw new AppError('Maximum USDT withdrawal is 10,000 USDT', 400);
+    }
+
+    // Validate address
+    if (!tronService.isValidAddress(toAddress)) {
+      throw new AppError('Invalid TRON wallet address', 400);
+    }
+
+    // Use transaction for atomic balance check and deduction
+    const result = await prisma.$transaction(async (tx) => {
+      const balance = await tx.userBalance.findUnique({
+        where: { userId },
+      });
+
+      if (!balance) {
+        throw new AppError('Balance not found', 404);
+      }
+
+      const currentBalance = Number(balance.usdtBalance);
+
+      if (currentBalance < amount) {
+        throw new AppError('Insufficient USDT balance', 400);
+      }
+
+      const newBalance = currentBalance - amount;
+
+      // Deduct balance immediately
+      await tx.userBalance.update({
+        where: { userId },
+        data: { usdtBalance: newBalance },
+      });
+
+      // Create pending transaction
+      const transaction = await tx.balanceTransaction.create({
+        data: {
+          userBalanceId: balance.id,
+          type: 'USDT_WITHDRAWAL',
+          status: 'PENDING',
+          currency: 'USDT',
+          amount: -amount, // Negative for withdrawals
+          balanceBefore: currentBalance,
+          balanceAfter: newBalance,
+          walletAddress: toAddress,
+          description: `USDT withdrawal to ${toAddress.slice(0, 8)}...`,
+        },
+      });
+
+      return { transaction, currentBalance, newBalance };
+    });
+
+    // Send USDT from hot wallet
+    try {
+      const sendResult = await tronService.sendUsdt(toAddress, amount);
+
+      if (sendResult.success && sendResult.txHash) {
+        // Update transaction with success
+        await prisma.balanceTransaction.update({
+          where: { id: result.transaction.id },
+          data: {
+            status: 'COMPLETED',
+            txHash: sendResult.txHash,
+            description: `USDT sent. TX: ${sendResult.txHash.slice(0, 16)}...`,
+            completedAt: new Date(),
+          },
+        });
+
+        logger.info(`USDT withdrawal completed for user ${userId}, Amount: ${amount}, TX: ${sendResult.txHash}`);
+
+        return {
+          transaction: {
+            id: result.transaction.id,
+            amount: Math.abs(Number(result.transaction.amount)).toString(),
+            status: 'COMPLETED',
+          },
+          txHash: sendResult.txHash,
+        };
+      } else {
+        throw new Error(sendResult.error || 'Failed to send USDT');
+      }
+    } catch (error: any) {
+      // Refund the balance
+      await prisma.$transaction(async (tx) => {
+        await tx.userBalance.update({
+          where: { userId },
+          data: { usdtBalance: { increment: amount } },
+        });
+
+        await tx.balanceTransaction.update({
+          where: { id: result.transaction.id },
+          data: {
+            status: 'FAILED',
+            description: `Withdrawal failed: ${error.message}`,
+            completedAt: new Date(),
+          },
+        });
+      });
+
+      logger.error(`USDT withdrawal failed for user ${userId}: ${error.message}`);
+      throw new AppError(`Withdrawal failed: ${error.message}`, 500);
+    }
+  }
+
+  /**
+   * Get USDT transaction history for user
+   */
+  async getUsdtTransactions(
+    userId: string,
+    params: { page?: number; limit?: number }
+  ) {
+    const { page = 1, limit = 20 } = params;
+    const skip = (page - 1) * limit;
+
+    const balance = await this.getOrCreateBalance(userId);
+
+    const where = {
+      userBalanceId: balance.id,
+      currency: 'USDT',
+    };
+
+    const [transactions, total] = await Promise.all([
+      prisma.balanceTransaction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.balanceTransaction.count({ where }),
+    ]);
+
+    return {
+      data: transactions.map((tx) => ({
+        id: tx.id,
+        type: tx.type,
+        status: tx.status,
+        amount: tx.amount.toString(),
+        balanceBefore: tx.balanceBefore.toString(),
+        balanceAfter: tx.balanceAfter.toString(),
+        txHash: tx.txHash,
+        walletAddress: tx.walletAddress,
+        description: tx.description,
+        createdAt: tx.createdAt,
+        completedAt: tx.completedAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 }

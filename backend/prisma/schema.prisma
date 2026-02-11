@@ -70,11 +70,13 @@ enum MpesaTransactionStatus {
 }
 
 enum BalanceTransactionType {
-  DEPOSIT           // M-Pesa deposit to balance
-  WITHDRAWAL        // Withdraw balance to M-Pesa
+  DEPOSIT           // M-Pesa deposit to KES balance
+  WITHDRAWAL        // Withdraw KES balance to M-Pesa
   ORDER_PAYMENT     // Used balance to pay for order
   ORDER_REFUND      // Refund from cancelled order
   ADJUSTMENT        // Admin adjustment
+  USDT_DEPOSIT      // USDT deposit to balance
+  USDT_WITHDRAWAL   // Withdraw USDT to external wallet
 }
 
 enum BalanceTransactionStatus {
@@ -289,7 +291,8 @@ model MpesaTransaction {
 model UserBalance {
   id            String     @id @default(uuid())
   userId        String     @unique
-  balance       Decimal    @default(0) @db.Decimal(18, 2)
+  balance       Decimal    @default(0) @db.Decimal(18, 2)  // KES balance
+  usdtBalance   Decimal    @default(0) @db.Decimal(18, 6)  // USDT balance (6 decimals)
   currency      String     @default("KES")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -305,13 +308,16 @@ model BalanceTransaction {
   userBalanceId   String
   type            BalanceTransactionType
   status          BalanceTransactionStatus  @default(PENDING)
-  amount          Decimal                   @db.Decimal(18, 2)
-  balanceBefore   Decimal                   @db.Decimal(18, 2)
-  balanceAfter    Decimal                   @db.Decimal(18, 2)
-  reference       String?                   // M-Pesa receipt, CheckoutRequestID, order number
+  currency        String                    @default("KES")  // KES or USDT
+  amount          Decimal                   @db.Decimal(18, 6)
+  balanceBefore   Decimal                   @db.Decimal(18, 6)
+  balanceAfter    Decimal                   @db.Decimal(18, 6)
+  reference       String?                   // M-Pesa receipt, tx hash, order number
   orderId         String?
   description     String?
-  phoneNumber     String?                   // For deposits/withdrawals
+  phoneNumber     String?                   // For KES deposits/withdrawals
+  walletAddress   String?                   // For USDT withdrawals
+  txHash          String?                   // For USDT transactions
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
   completedAt     DateTime?
@@ -324,6 +330,7 @@ model BalanceTransaction {
   @@index([status])
   @@index([orderId])
   @@index([reference])
+  @@index([currency])
   @@index([createdAt])
 }
 

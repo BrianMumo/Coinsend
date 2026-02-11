@@ -4,6 +4,8 @@ import {
   BalanceWithHistory,
   BalanceTransaction,
   Pagination,
+  UsdtBalance,
+  UsdtTransaction,
 } from '../types';
 
 export interface DepositResponse {
@@ -16,6 +18,13 @@ export interface DepositResponse {
 export interface WithdrawResponse {
   transactionId: string;
   amount: string;
+}
+
+export interface UsdtWithdrawResponse {
+  transactionId: string;
+  amount: string;
+  txHash?: string;
+  status: string;
 }
 
 export interface TransactionStatusResponse {
@@ -92,6 +101,38 @@ export const balanceApi = {
     transactionId: string
   ): Promise<ApiResponse<TransactionStatusResponse>> => {
     const response = await api.get(`/balance/withdraw/${transactionId}/status`);
+    return response.data;
+  },
+
+  // ============ USDT METHODS ============
+
+  /**
+   * Get USDT balance and deposit address
+   */
+  getUsdtBalance: async (): Promise<ApiResponse<UsdtBalance>> => {
+    const response = await api.get('/balance/usdt');
+    return response.data;
+  },
+
+  /**
+   * Get USDT transaction history
+   */
+  getUsdtTransactions: async (params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<UsdtTransaction[]> & { pagination?: Pagination }> => {
+    const response = await api.get('/balance/usdt/transactions', { params });
+    return response.data;
+  },
+
+  /**
+   * Withdraw USDT to external wallet
+   */
+  withdrawUsdt: async (
+    amount: number,
+    walletAddress: string
+  ): Promise<ApiResponse<UsdtWithdrawResponse>> => {
+    const response = await api.post('/balance/usdt/withdraw', { amount, walletAddress });
     return response.data;
   },
 };

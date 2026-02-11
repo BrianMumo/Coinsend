@@ -17,16 +17,18 @@ export type KycStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
 // User Balance types
 export interface UserBalance {
   balance: string;
+  usdtBalance?: string;
   currency: string;
 }
 
-export type BalanceTransactionType = 'DEPOSIT' | 'WITHDRAWAL' | 'ORDER_PAYMENT' | 'ORDER_REFUND' | 'ADJUSTMENT';
+export type BalanceTransactionType = 'DEPOSIT' | 'WITHDRAWAL' | 'ORDER_PAYMENT' | 'ORDER_REFUND' | 'ADJUSTMENT' | 'USDT_DEPOSIT' | 'USDT_WITHDRAWAL';
 export type BalanceTransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export interface BalanceTransaction {
   id: string;
   type: BalanceTransactionType;
   status: BalanceTransactionStatus;
+  currency?: string;
   amount: string;
   balanceBefore: string;
   balanceAfter: string;
@@ -36,14 +38,37 @@ export interface BalanceTransaction {
   orderType?: OrderType | null;
   description: string | null;
   phoneNumber?: string | null;
+  txHash?: string | null;
+  walletAddress?: string | null;
   createdAt: string;
   completedAt: string | null;
 }
 
 export interface BalanceWithHistory {
-  balance: UserBalance & { id: string; updatedAt: string };
+  balance: UserBalance & { id: string; usdtBalance: string; updatedAt: string };
   transactions: BalanceTransaction[];
   pagination: Pagination;
+}
+
+// USDT Balance types
+export interface UsdtBalance {
+  usdtBalance: string;
+  depositAddress: string;
+  network: string;
+}
+
+export interface UsdtTransaction {
+  id: string;
+  type: 'USDT_DEPOSIT' | 'USDT_WITHDRAWAL';
+  status: BalanceTransactionStatus;
+  amount: string;
+  balanceBefore: string;
+  balanceAfter: string;
+  txHash: string | null;
+  walletAddress: string | null;
+  description: string | null;
+  createdAt: string;
+  completedAt: string | null;
 }
 
 // Payment source for orders

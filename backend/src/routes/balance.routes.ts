@@ -37,8 +37,19 @@ const withdrawValidation = [
 const transactionQueryValidation = [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
-  query('type').optional().isIn(['DEPOSIT', 'WITHDRAWAL', 'ORDER_PAYMENT', 'ORDER_REFUND', 'ADJUSTMENT']).withMessage('Invalid transaction type'),
+  query('type').optional().isIn(['DEPOSIT', 'WITHDRAWAL', 'ORDER_PAYMENT', 'ORDER_REFUND', 'ADJUSTMENT', 'USDT_DEPOSIT', 'USDT_WITHDRAWAL']).withMessage('Invalid transaction type'),
   query('status').optional().isIn(['PENDING', 'COMPLETED', 'FAILED', 'CANCELLED']).withMessage('Invalid status'),
+];
+
+const usdtWithdrawValidation = [
+  body('amount')
+    .isFloat({ min: 1, max: 10000 })
+    .withMessage('Amount must be between 1 and 10,000 USDT'),
+  body('walletAddress')
+    .notEmpty()
+    .withMessage('Wallet address is required')
+    .isLength({ min: 30, max: 50 })
+    .withMessage('Invalid TRON wallet address'),
 ];
 
 /**
@@ -184,6 +195,82 @@ router.get(
     res.json({
       success: true,
       data: result,
+    });
+  })
+);
+
+// ============ USDT ROUTES ============
+
+/**
+ * GET /api/balance/usdt
+ * Get USDT balance and deposit address
+ */
+router.get(
+  '/usdt',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const balance = await balanceService.getOrCreateBalance(req.user!.userId);
+
+    res.json({
+      success: true,
+      data: {
+        usdtBalance: balance.usdtBalance.toString(),
+        depositAddress: balanceService.getUsdtDepositAddress(),
+        network: 'TRON (TRC-20)',
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/balance/usdt/transactions
+ * Get USDT transaction history
+ */
+router.get(
+  '/usdt/transactions',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const result = await balanceService.getUsdtTransactions(req.user!.userId, {
+      page,
+      limit,
+    });
+
+    res.json({
+      success: true,
+      data: result.data,
+      pagination: result.pagination,
+    });
+  })
+);
+
+/**
+ * POST /api/balance/usdt/withdraw
+ * Withdraw USDT to external wallet
+ */
+router.post(
+  '/usdt/withdraw',
+  validate(usdtWithdrawValidation),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { amount, walletAddress } = req.body;
+
+    logger.info(`USDT withdrawal request from user ${req.user!.userId}: Amount ${amount}, Address ${walletAddress}`);
+
+    const result = await balanceService.withdrawUsdt(
+      req.user!.userId,
+      parseFloat(amount),
+      walletAddress
+    );
+
+    res.json({
+      success: true,
+      message: 'USDT withdrawal processed successfully',
+      data: {
+        transactionId: result.transaction.id,
+        amount: result.transaction.amount,
+        txHash: result.txHash,
+        status: result.transaction.status,
+      },
     });
   })
 );
