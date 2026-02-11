@@ -286,14 +286,15 @@ class TronService {
     amount: number
   ): Promise<void> {
     // First, try to match to pending USDT deposit intents (user-initiated)
+    // Use tight tolerance (0.001 USDT) for exact amount matching - unique amounts ensure security
     const pendingDeposit = await prisma.pendingUsdtDeposit.findFirst({
       where: {
         status: 'PENDING',
         expiresAt: { gt: new Date() },
-        // Match by approximate amount (within 0.5 USDT tolerance)
+        // Match by exact amount (within 0.001 USDT for floating point precision)
         expectedAmount: {
-          gte: amount - 0.5,
-          lte: amount + 0.5,
+          gte: amount - 0.001,
+          lte: amount + 0.001,
         },
       },
       orderBy: { createdAt: 'asc' },
@@ -429,6 +430,17 @@ class TronService {
   }
 
   /**
+   * Generate a unique deposit amount by adding random decimals
+   * This ensures each deposit can be uniquely identified
+   */
+  private generateUniqueAmount(baseAmount: number): number {
+    // Add random 4 decimal places (0.0001 to 0.0999)
+    const randomDecimals = Math.floor(Math.random() * 999) + 1;
+    const uniqueAmount = baseAmount + (randomDecimals / 10000);
+    return Math.round(uniqueAmount * 10000) / 10000; // Round to 4 decimals
+  }
+
+  /**
    * Create a pending deposit intent for a user
    */
   async createDepositIntent(
@@ -453,7 +465,26 @@ class TronService {
     }
 
     const exchangeRate = Number(rate.buyRate);
-    const estimatedKes = expectedAmount * exchangeRate;
+
+    // Generate unique amount with random decimals for secure matching
+    let uniqueAmount = this.generateUniqueAmount(expectedAmount);
+
+    // Ensure this exact amount isn't already pending (very unlikely but check anyway)
+    let attempts = 0;
+    while (attempts < 10) {
+      const existing = await prisma.pendingUsdtDeposit.findFirst({
+        where: {
+          expectedAmount: uniqueAmount,
+          status: 'PENDING',
+          expiresAt: { gt: new Date() },
+        },
+      });
+      if (!existing) break;
+      uniqueAmount = this.generateUniqueAmount(expectedAmount);
+      attempts++;
+    }
+
+    const estimatedKes = uniqueAmount * exchangeRate;
 
     // Expire any existing pending intents for this user
     await prisma.pendingUsdtDeposit.updateMany({
@@ -472,18 +503,18 @@ class TronService {
     const intent = await prisma.pendingUsdtDeposit.create({
       data: {
         userId,
-        expectedAmount,
+        expectedAmount: uniqueAmount,
         exchangeRate,
         kesAmount: estimatedKes,
         expiresAt,
       },
     });
 
-    logger.info(`Created deposit intent for user ${userId}: ${expectedAmount} USDT, expected KES ${estimatedKes.toFixed(2)}`);
+    logger.info(`Created deposit intent for user ${userId}: ${uniqueAmount} USDT (unique amount), expected KES ${estimatedKes.toFixed(2)}`);
 
     return {
       id: intent.id,
-      expectedAmount,
+      expectedAmount: uniqueAmount,
       expiresAt,
       depositAddress: this.getHotWalletAddress(),
       exchangeRate,

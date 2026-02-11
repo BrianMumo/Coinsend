@@ -710,4 +710,126 @@ router.get(
   })
 );
 
+// Manually trigger deposit check (for debugging)
+router.post(
+  '/tron/check-deposits',
+  requireRole('ADMIN', 'SUPER_ADMIN'),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { depositMonitor } = await import('../services/depositMonitor.service');
+
+    // Get pending intents for debugging
+    const pendingIntents = await prisma.pendingUsdtDeposit.findMany({
+      where: {
+        status: 'PENDING',
+        expiresAt: { gt: new Date() },
+      },
+      include: { user: { select: { email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    // Manually trigger deposit check
+    const newDeposits = await depositMonitor.manualCheck();
+
+    // Get recent crypto transactions
+    const recentDeposits = await prisma.cryptoTransaction.findMany({
+      where: { type: 'DEPOSIT' },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    res.json({
+      success: true,
+      message: `Manual deposit check completed. Found ${newDeposits} new deposits.`,
+      data: {
+        newDepositsFound: newDeposits,
+        monitorStatus: depositMonitor.getStatus(),
+        pendingIntents: pendingIntents.map(i => ({
+          id: i.id,
+          user: i.user.email,
+          expectedAmount: Number(i.expectedAmount),
+          status: i.status,
+          expiresAt: i.expiresAt,
+          createdAt: i.createdAt,
+        })),
+        recentDeposits: recentDeposits.map(d => ({
+          txHash: d.txHash,
+          amount: Number(d.amount),
+          fromAddress: d.fromAddress,
+          status: d.status,
+          createdAt: d.createdAt,
+        })),
+      },
+    });
+  })
+);
+
+// Credit user balance manually (for missed deposits)
+router.post(
+  '/users/:userId/credit-deposit',
+  requireRole('SUPER_ADMIN'),
+  validate([
+    body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be positive'),
+    body('txHash').notEmpty().withMessage('Transaction hash is required'),
+    body('usdtAmount').isFloat({ min: 0.01 }).withMessage('USDT amount is required'),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { userId } = req.params;
+    const { amount, txHash, usdtAmount } = req.body;
+
+    // Get or create user balance
+    let userBalance = await prisma.userBalance.findUnique({
+      where: { userId },
+    });
+
+    if (!userBalance) {
+      userBalance = await prisma.userBalance.create({
+        data: {
+          userId,
+          balance: 0,
+          usdtBalance: 0,
+          currency: 'KES',
+        },
+      });
+    }
+
+    const currentBalance = Number(userBalance.balance);
+    const newBalance = currentBalance + amount;
+
+    // Credit the balance
+    await prisma.$transaction([
+      prisma.userBalance.update({
+        where: { userId },
+        data: { balance: newBalance },
+      }),
+      prisma.balanceTransaction.create({
+        data: {
+          userBalanceId: userBalance.id,
+          type: 'USDT_DEPOSIT',
+          status: 'COMPLETED',
+          currency: 'KES',
+          amount: amount,
+          balanceBefore: currentBalance,
+          balanceAfter: newBalance,
+          txHash,
+          reference: txHash,
+          description: `Manual credit: ${usdtAmount} USDT → KES ${amount.toFixed(2)} (Admin: ${req.admin!.email})`,
+          completedAt: new Date(),
+        },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      message: `Credited KES ${amount.toFixed(2)} to user`,
+      data: {
+        userId,
+        previousBalance: currentBalance,
+        newBalance,
+        creditedAmount: amount,
+      },
+    });
+  })
+);
+
 export default router;

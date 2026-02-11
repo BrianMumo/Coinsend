@@ -476,14 +476,21 @@ const WalletPage = () => {
             {/* Step 2: Show Address */}
             {depositStep === 'address' && depositIntent && (
               <div className="space-y-4">
+                {/* IMPORTANT: Exact Amount Box */}
+                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-center">
+                  <p className="text-xs text-red-600 font-medium mb-1">⚠️ SEND EXACTLY THIS AMOUNT</p>
+                  <p className="text-2xl font-bold text-red-700">
+                    {depositIntent.expectedAmount.toFixed(4)} USDT
+                  </p>
+                  <p className="text-xs text-red-500 mt-1">
+                    The decimals are unique to your deposit. Sending a different amount will not be credited.
+                  </p>
+                </div>
+
                 {/* Summary */}
                 <div className="bg-green-50 rounded-xl p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-green-600">You send</span>
-                    <span className="font-bold text-green-800">{depositIntent.expectedAmount} USDT</span>
-                  </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-green-600">You receive</span>
+                    <span className="text-sm text-green-600">You will receive</span>
                     <span className="font-bold text-green-800">
                       KES {depositIntent.estimatedKes.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </span>
@@ -493,7 +500,7 @@ const WalletPage = () => {
                 {/* Deposit Address */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Send exactly {depositIntent.expectedAmount} USDT to:
+                    Deposit Address (TRC-20):
                   </label>
                   <div className="bg-gray-50 rounded-xl p-3">
                     <div className="flex items-center justify-between gap-2">
@@ -523,7 +530,7 @@ const WalletPage = () => {
                 {/* Network Warning */}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
                   <p className="text-xs text-yellow-800">
-                    <strong>⚠️ TRON Network Only</strong> - Send USDT on TRC-20 network only.
+                    <strong>⚠️ TRON Network Only</strong> - Send USDT on TRC-20 network only. Other networks will not be detected.
                   </p>
                 </div>
 
@@ -555,7 +562,7 @@ const WalletPage = () => {
                 <div>
                   <p className="font-medium text-gray-900">Waiting for your deposit...</p>
                   <p className="text-sm text-gray-500 mt-1">
-                    We're monitoring for {depositIntent.expectedAmount} USDT
+                    We're monitoring for exactly <strong>{depositIntent.expectedAmount.toFixed(4)} USDT</strong>
                   </p>
                 </div>
 
