@@ -3,7 +3,7 @@ import { Link, useLocation, Navigate } from 'react-router-dom';
 import { useAdminAuthStore } from '../../store/adminAuthStore';
 import {
   LayoutDashboard,
-  Receipt,
+  ArrowLeftRight,
   Users,
   DollarSign,
   Wallet,
@@ -22,7 +22,7 @@ interface AdminLayoutProps {
 
 const sidebarLinks = [
   { to: '/mumo', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/mumo/orders', icon: Receipt, label: 'Orders' },
+  { to: '/mumo/transactions', icon: ArrowLeftRight, label: 'Transactions' },
   { to: '/mumo/users', icon: Users, label: 'Users' },
   { to: '/mumo/mpesa', icon: Smartphone, label: 'M-Pesa' },
   { to: '/mumo/tron', icon: Coins, label: 'TRON Wallet' },

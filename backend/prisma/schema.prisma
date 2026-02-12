@@ -70,13 +70,14 @@ enum MpesaTransactionStatus {
 }
 
 enum BalanceTransactionType {
-  DEPOSIT           // M-Pesa deposit to KES balance
-  WITHDRAWAL        // Withdraw KES balance to M-Pesa
-  ORDER_PAYMENT     // Used balance to pay for order
-  ORDER_REFUND      // Refund from cancelled order
+  DEPOSIT           // M-Pesa deposit to KES balance (deprecated)
+  WITHDRAWAL        // Withdraw KES balance to M-Pesa (deprecated)
+  ORDER_PAYMENT     // Used balance to pay for order (deprecated)
+  ORDER_REFUND      // Refund from cancelled order (deprecated)
   ADJUSTMENT        // Admin adjustment
   USDT_DEPOSIT      // USDT deposit to balance
   USDT_WITHDRAWAL   // Withdraw USDT to external wallet
+  KES_WITHDRAWAL    // Withdraw as KES to M-Pesa (converts USDT at rate)
 }
 
 enum BalanceTransactionStatus {

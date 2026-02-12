@@ -38,8 +38,19 @@ const withdrawValidation = [
 const transactionQueryValidation = [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
-  query('type').optional().isIn(['DEPOSIT', 'WITHDRAWAL', 'ORDER_PAYMENT', 'ORDER_REFUND', 'ADJUSTMENT', 'USDT_DEPOSIT', 'USDT_WITHDRAWAL']).withMessage('Invalid transaction type'),
+  query('type').optional().isIn(['DEPOSIT', 'WITHDRAWAL', 'ORDER_PAYMENT', 'ORDER_REFUND', 'ADJUSTMENT', 'USDT_DEPOSIT', 'USDT_WITHDRAWAL', 'KES_WITHDRAWAL']).withMessage('Invalid transaction type'),
   query('status').optional().isIn(['PENDING', 'COMPLETED', 'FAILED', 'CANCELLED']).withMessage('Invalid status'),
+];
+
+const kesWithdrawValidation = [
+  body('amount')
+    .isFloat({ min: 1, max: 5000 })
+    .withMessage('Amount must be between 1 and 5,000 USDT'),
+  body('phoneNumber')
+    .notEmpty()
+    .withMessage('Phone number is required')
+    .isMobilePhone('any')
+    .withMessage('Valid phone number required'),
 ];
 
 const usdtWithdrawValidation = [
@@ -210,6 +221,38 @@ router.get(
     res.json({
       success: true,
       data: result,
+    });
+  })
+);
+
+/**
+ * POST /api/balance/withdraw-kes
+ * Withdraw USDT as KES to M-Pesa (converts at current rate)
+ */
+router.post(
+  '/withdraw-kes',
+  validate(kesWithdrawValidation),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { amount, phoneNumber } = req.body;
+
+    logger.info(`KES withdrawal request from user ${req.user!.userId}: ${amount} USDT, Phone ${phoneNumber}`);
+
+    const result = await balanceService.withdrawToKes(
+      req.user!.userId,
+      parseFloat(amount),
+      phoneNumber
+    );
+
+    res.json({
+      success: true,
+      message: `Sending KES ${result.kesAmount.toLocaleString()} to ${phoneNumber}`,
+      data: {
+        transactionId: result.transaction.id,
+        usdtAmount: result.transaction.usdtAmount,
+        kesAmount: result.kesAmount.toString(),
+        rate: result.rate,
+        status: result.transaction.status,
+      },
     });
   })
 );

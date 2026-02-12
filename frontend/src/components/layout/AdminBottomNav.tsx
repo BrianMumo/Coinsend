@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Receipt,
+  ArrowLeftRight,
   Users,
   Smartphone,
   MoreHorizontal,
@@ -11,7 +11,7 @@ import { useState } from 'react';
 
 const mainNavItems = [
   { to: '/mumo', icon: LayoutDashboard, label: 'Home', exact: true },
-  { to: '/mumo/orders', icon: Receipt, label: 'Orders' },
+  { to: '/mumo/transactions', icon: ArrowLeftRight, label: 'Transactions' },
   { to: '/mumo/users', icon: Users, label: 'Users' },
   { to: '/mumo/mpesa', icon: Smartphone, label: 'M-Pesa' },
 ];

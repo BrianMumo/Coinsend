@@ -27,6 +27,14 @@ export interface UsdtWithdrawResponse {
   status: string;
 }
 
+export interface KesWithdrawResponse {
+  transactionId: string;
+  usdtAmount: string;
+  kesAmount: string;
+  rate: number;
+  status: string;
+}
+
 export interface DepositIntentResponse {
   intentId: string;
   expectedAmount: number;
@@ -123,6 +131,17 @@ export const balanceApi = {
     transactionId: string
   ): Promise<ApiResponse<TransactionStatusResponse>> => {
     const response = await api.get(`/balance/withdraw/${transactionId}/status`);
+    return response.data;
+  },
+
+  /**
+   * Withdraw USDT as KES to M-Pesa (converts at current rate)
+   */
+  withdrawToKes: async (
+    amount: number,
+    phoneNumber: string
+  ): Promise<ApiResponse<KesWithdrawResponse>> => {
+    const response = await api.post('/balance/withdraw-kes', { amount, phoneNumber });
     return response.data;
   },
 

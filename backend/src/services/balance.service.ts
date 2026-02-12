@@ -1,6 +1,7 @@
 import { PrismaClient, BalanceTransactionType, BalanceTransactionStatus } from '@prisma/client';
 import { mpesaService } from './mpesa.service';
 import { tronService } from './tron.service';
+import { rateService } from './rate.service';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
 
@@ -834,6 +835,200 @@ class BalanceService {
 
       logger.error(`USDT withdrawal failed for user ${userId}: ${error.message}`);
       throw new AppError(`Withdrawal failed: ${error.message}`, 500);
+    }
+  }
+
+  /**
+   * Withdraw USDT as KES to M-Pesa
+   * Converts USDT at current rate, sends KES via B2C
+   */
+  async withdrawToKes(
+    userId: string,
+    usdtAmount: number,
+    phoneNumber: string
+  ): Promise<{
+    transaction: any;
+    kesAmount: number;
+    rate: number;
+  }> {
+    // Validate USDT amount
+    if (usdtAmount < 1) {
+      throw new AppError('Minimum withdrawal is 1 USDT', 400);
+    }
+    if (usdtAmount > 5000) {
+      throw new AppError('Maximum withdrawal is 5,000 USDT', 400);
+    }
+
+    // Get current USDT/KES sell rate
+    const rateData = await rateService.getRateByPair('USDT_KES');
+    if (!rateData) {
+      throw new AppError('Exchange rate not available', 500);
+    }
+
+    const rate = Number(rateData.sellRate);
+    const kesAmount = Math.floor(usdtAmount * rate); // Round down to whole KES
+
+    // Validate KES amount against M-Pesa limits
+    if (kesAmount < 10) {
+      throw new AppError('Withdrawal amount too small (minimum KES 10)', 400);
+    }
+    if (kesAmount > 150000) {
+      throw new AppError('Withdrawal amount too large (maximum KES 150,000)', 400);
+    }
+
+    // Use transaction for atomic balance check and deduction
+    const result = await prisma.$transaction(async (tx) => {
+      const balance = await tx.userBalance.findUnique({
+        where: { userId },
+      });
+
+      if (!balance) {
+        throw new AppError('Balance not found', 404);
+      }
+
+      const currentUsdtBalance = Number(balance.usdtBalance);
+
+      if (currentUsdtBalance < usdtAmount) {
+        throw new AppError('Insufficient USDT balance', 400);
+      }
+
+      const newUsdtBalance = currentUsdtBalance - usdtAmount;
+
+      // Deduct USDT balance immediately (will be refunded if B2C fails)
+      await tx.userBalance.update({
+        where: { userId },
+        data: { usdtBalance: newUsdtBalance },
+      });
+
+      // Create pending transaction
+      const transaction = await tx.balanceTransaction.create({
+        data: {
+          userBalanceId: balance.id,
+          type: 'KES_WITHDRAWAL',
+          status: 'PENDING',
+          currency: 'USDT',
+          amount: -usdtAmount, // Negative for withdrawals (USDT deducted)
+          balanceBefore: currentUsdtBalance,
+          balanceAfter: newUsdtBalance,
+          phoneNumber,
+          description: `Withdraw ${usdtAmount} USDT as KES ${kesAmount.toLocaleString()} @ ${rate}`,
+        },
+      });
+
+      return { transaction, currentUsdtBalance, newUsdtBalance };
+    });
+
+    try {
+      // Initiate B2C payment for KES amount
+      const b2cResponse = await mpesaService.initiateB2CPayment(
+        phoneNumber,
+        kesAmount,
+        'BusinessPayment',
+        `Coinsend: ${usdtAmount} USDT withdrawal`
+      );
+
+      // Update transaction with OriginatorConversationID as reference
+      await prisma.balanceTransaction.update({
+        where: { id: result.transaction.id },
+        data: {
+          reference: b2cResponse.OriginatorConversationID,
+        },
+      });
+
+      logger.info(`KES withdrawal initiated for user ${userId}, USDT: ${usdtAmount}, KES: ${kesAmount}, Rate: ${rate}`);
+
+      return {
+        transaction: {
+          id: result.transaction.id,
+          usdtAmount: Math.abs(Number(result.transaction.amount)).toString(),
+          kesAmount: kesAmount.toString(),
+          status: result.transaction.status,
+        },
+        kesAmount,
+        rate,
+      };
+    } catch (error: any) {
+      // Refund the USDT balance
+      await prisma.$transaction(async (tx) => {
+        await tx.userBalance.update({
+          where: { userId },
+          data: { usdtBalance: { increment: usdtAmount } },
+        });
+
+        await tx.balanceTransaction.update({
+          where: { id: result.transaction.id },
+          data: {
+            status: 'FAILED',
+            description: `Withdrawal failed: ${error.message}`,
+            completedAt: new Date(),
+          },
+        });
+      });
+
+      logger.error(`KES withdrawal failed for user ${userId}: ${error.message}`);
+      throw new AppError(`Withdrawal failed: ${error.message}`, 500);
+    }
+  }
+
+  /**
+   * Process KES withdrawal callback from M-Pesa B2C
+   */
+  async processKesWithdrawalCallback(
+    originatorConversationId: string,
+    success: boolean,
+    mpesaReceiptNumber?: string
+  ): Promise<void> {
+    // Find pending KES withdrawal transaction
+    const transaction = await prisma.balanceTransaction.findFirst({
+      where: {
+        reference: originatorConversationId,
+        type: 'KES_WITHDRAWAL',
+        status: 'PENDING',
+      },
+      include: {
+        userBalance: true,
+      },
+    });
+
+    if (!transaction) {
+      logger.warn(`No pending KES withdrawal found for OriginatorConversationID: ${originatorConversationId}`);
+      return;
+    }
+
+    if (success) {
+      // Mark as completed
+      await prisma.balanceTransaction.update({
+        where: { id: transaction.id },
+        data: {
+          status: 'COMPLETED',
+          reference: mpesaReceiptNumber || originatorConversationId,
+          description: `${transaction.description} - Receipt: ${mpesaReceiptNumber || 'N/A'}`,
+          completedAt: new Date(),
+        },
+      });
+
+      logger.info(`KES withdrawal completed for transaction ${transaction.id}, Receipt: ${mpesaReceiptNumber}`);
+    } else {
+      // Refund the USDT balance
+      const refundAmount = Math.abs(Number(transaction.amount));
+
+      await prisma.$transaction(async (tx) => {
+        await tx.userBalance.update({
+          where: { id: transaction.userBalanceId },
+          data: { usdtBalance: { increment: refundAmount } },
+        });
+
+        await tx.balanceTransaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'FAILED',
+            description: `${transaction.description} - Failed, USDT refunded`,
+            completedAt: new Date(),
+          },
+        });
+      });
+
+      logger.warn(`KES withdrawal failed for transaction ${transaction.id}, USDT refunded`);
     }
   }
 

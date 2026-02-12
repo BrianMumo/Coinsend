@@ -202,24 +202,32 @@ router.post(
       }
     }
 
-    // Check if this is a balance withdrawal
+    // Check if this is a balance withdrawal (old WITHDRAWAL or new KES_WITHDRAWAL)
     const withdrawalTx = await prisma.balanceTransaction.findFirst({
       where: {
         reference: OriginatorConversationID,
-        type: 'WITHDRAWAL',
+        type: { in: ['WITHDRAWAL', 'KES_WITHDRAWAL'] },
         status: 'PENDING',
       },
     });
 
     if (withdrawalTx) {
-      // This is a balance withdrawal - delegate to balance service
+      // Delegate to appropriate callback handler
       const { balanceService } = await import('../services/balance.service');
-      await balanceService.processWithdrawalCallback(
-        OriginatorConversationID,
-        ResultCode === 0,
-        mpesaReceiptNumber
-      );
-      logger.info(`Processed withdrawal callback for transaction ${withdrawalTx.id}`);
+      if (withdrawalTx.type === 'KES_WITHDRAWAL') {
+        await balanceService.processKesWithdrawalCallback(
+          OriginatorConversationID,
+          ResultCode === 0,
+          mpesaReceiptNumber
+        );
+      } else {
+        await balanceService.processWithdrawalCallback(
+          OriginatorConversationID,
+          ResultCode === 0,
+          mpesaReceiptNumber
+        );
+      }
+      logger.info(`Processed ${withdrawalTx.type} callback for transaction ${withdrawalTx.id}`);
     }
 
     // Also process in MpesaTransaction table for audit trail
@@ -244,23 +252,30 @@ router.post(
     const { OriginatorConversationID } = req.body.Result || {};
 
     if (OriginatorConversationID) {
-      // Check if this is a balance withdrawal
+      // Check if this is a balance withdrawal (old WITHDRAWAL or new KES_WITHDRAWAL)
       const withdrawalTx = await prisma.balanceTransaction.findFirst({
         where: {
           reference: OriginatorConversationID,
-          type: 'WITHDRAWAL',
+          type: { in: ['WITHDRAWAL', 'KES_WITHDRAWAL'] },
           status: 'PENDING',
         },
       });
 
       if (withdrawalTx) {
-        // This is a balance withdrawal - mark as failed and refund
+        // Mark as failed and refund
         const { balanceService } = await import('../services/balance.service');
-        await balanceService.processWithdrawalCallback(
-          OriginatorConversationID,
-          false // failed
-        );
-        logger.info(`Processed withdrawal timeout for transaction ${withdrawalTx.id}`);
+        if (withdrawalTx.type === 'KES_WITHDRAWAL') {
+          await balanceService.processKesWithdrawalCallback(
+            OriginatorConversationID,
+            false // failed
+          );
+        } else {
+          await balanceService.processWithdrawalCallback(
+            OriginatorConversationID,
+            false // failed
+          );
+        }
+        logger.info(`Processed ${withdrawalTx.type} timeout for transaction ${withdrawalTx.id}`);
       }
 
       // Update MpesaTransaction table

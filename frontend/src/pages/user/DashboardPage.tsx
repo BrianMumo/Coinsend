@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Badge, getStatusVariant } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
 import { balanceApi } from '../../api/balance.api';
+import { ratesApi } from '../../api/rates.api';
 import { BalanceTransaction } from '../../types';
 import { formatDate, formatStatus } from '../../utils/formatters';
 import {
@@ -20,15 +21,19 @@ const DashboardPage = () => {
   const [recentTransactions, setRecentTransactions] = useState<BalanceTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showBalance, setShowBalance] = useState(true);
-  const [kesBalance, setKesBalance] = useState('0');
+  const [usdtBalance, setUsdtBalance] = useState('0');
+  const [usdtRate, setUsdtRate] = useState(130); // Default USDT/KES rate
 
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const balanceResponse = await balanceApi.getBalance({ limit: 10 });
+      const [balanceResponse, ratesResponse] = await Promise.all([
+        balanceApi.getBalance({ limit: 10 }),
+        ratesApi.getAll(),
+      ]);
 
       if (balanceResponse.success && balanceResponse.data) {
-        setKesBalance(balanceResponse.data.balance.balance);
+        setUsdtBalance(balanceResponse.data.balance.usdtBalance || '0');
         setRecentTransactions(balanceResponse.data.transactions || []);
 
         // Update user balance in store
@@ -39,6 +44,16 @@ const DashboardPage = () => {
             currency: balanceResponse.data.balance.currency,
           },
         });
+      }
+
+      // Get USDT/KES rate
+      if (ratesResponse.success && ratesResponse.data?.rates) {
+        const usdtKesRate = ratesResponse.data.rates.find(
+          (r) => r.pair === 'USDT_KES' && r.isActive
+        );
+        if (usdtKesRate) {
+          setUsdtRate(Number(usdtKesRate.sellRate));
+        }
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -58,25 +73,33 @@ const DashboardPage = () => {
       ORDER_PAYMENT: 'Order Payment',
       ORDER_REFUND: 'Refund',
       ADJUSTMENT: 'Adjustment',
-      USDT_DEPOSIT: 'USDT → KES',
+      USDT_DEPOSIT: 'USDT Deposit',
       USDT_WITHDRAWAL: 'USDT Withdrawal',
+      KES_WITHDRAWAL: 'USDT → M-Pesa',
     };
     return types[type] || type;
   };
 
   const getTransactionIcon = (type: string) => {
+    // Deposits and refunds are incoming (green)
     if (type.includes('DEPOSIT') || type === 'ORDER_REFUND') {
       return <ArrowDownLeft className="h-4 w-4 text-green-600" />;
     }
+    // Withdrawals are outgoing (red)
     return <ArrowUpRight className="h-4 w-4 text-red-600" />;
+  };
+
+  // Helper to determine if a transaction is USDT-based
+  const isUsdtTransaction = (type: string) => {
+    return type === 'USDT_DEPOSIT' || type === 'USDT_WITHDRAWAL' || type === 'KES_WITHDRAWAL';
   };
 
   return (
     <div className="space-y-4">
       {/* Header with greeting */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-          <span className="text-green-600 font-semibold text-sm">
+        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+          <span className="text-blue-600 font-semibold text-sm">
             {user?.firstName?.[0] || user?.email?.[0] || 'U'}
           </span>
         </div>
@@ -88,8 +111,8 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* KES Balance Card */}
-      <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white relative overflow-hidden">
+      {/* USDT Balance Card */}
+      <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white relative overflow-hidden">
         {/* Decorative pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
@@ -97,14 +120,14 @@ const DashboardPage = () => {
 
         <div className="relative">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">🇰🇪</span>
-            <span className="text-sm font-medium">Kenyan Shilling</span>
+            <span className="text-lg">💵</span>
+            <span className="text-sm font-medium">USDT Balance</span>
           </div>
 
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-1">
             <p className="text-3xl font-bold">
-              Ksh {showBalance
-                ? parseFloat(kesBalance).toLocaleString(undefined, { minimumFractionDigits: 0 })
+              ${showBalance
+                ? parseFloat(usdtBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 : '••••••'
               }
             </p>
@@ -113,12 +136,20 @@ const DashboardPage = () => {
               className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
             >
               {showBalance ? (
-                <EyeOff className="h-5 w-5 text-green-100" />
+                <EyeOff className="h-5 w-5 text-blue-100" />
               ) : (
-                <Eye className="h-5 w-5 text-green-100" />
+                <Eye className="h-5 w-5 text-blue-100" />
               )}
             </button>
           </div>
+
+          {/* KES Equivalent */}
+          <p className="text-sm text-blue-100 mb-4">
+            {showBalance
+              ? `≈ KES ${(parseFloat(usdtBalance) * usdtRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+              : '≈ KES ••••••'
+            }
+          </p>
 
           {/* Quick Actions */}
           <div className="flex gap-3">
@@ -127,14 +158,14 @@ const DashboardPage = () => {
               className="flex-1 bg-white/20 hover:bg-white/30 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors"
             >
               <ArrowDownLeft className="h-4 w-4" />
-              Deposit
+              Deposit USDT
             </button>
             <button
               onClick={() => navigate('/wallet', { state: { action: 'withdraw' } })}
               className="flex-1 bg-white/20 hover:bg-white/30 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors"
             >
               <ArrowUpRight className="h-4 w-4" />
-              Withdraw
+              Withdraw KES
             </button>
           </div>
         </div>
@@ -143,7 +174,7 @@ const DashboardPage = () => {
       {/* How it works */}
       <div className="bg-blue-50 rounded-xl p-3">
         <p className="text-sm text-blue-800">
-          <strong>How it works:</strong> Deposit USDT to get KES instantly. Withdraw to M-Pesa anytime.
+          <strong>How it works:</strong> Deposit USDT to your balance. Withdraw to M-Pesa at the current rate anytime.
         </p>
       </div>
 
@@ -153,7 +184,7 @@ const DashboardPage = () => {
           <h3 className="font-semibold text-gray-900">Recent Transactions</h3>
           <Link
             to="/wallet"
-            className="text-sm text-green-600 hover:text-green-700 flex items-center font-medium"
+            className="text-sm text-blue-600 hover:text-blue-700 flex items-center font-medium"
           >
             See all <ChevronRight className="h-4 w-4" />
           </Link>
@@ -173,9 +204,9 @@ const DashboardPage = () => {
             <p className="text-gray-500 text-sm mb-1">No transactions yet</p>
             <button
               onClick={() => navigate('/wallet', { state: { action: 'deposit' } })}
-              className="text-sm text-green-600 hover:text-green-700 font-medium"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
-              Make your first deposit →
+              Make your first USDT deposit →
             </button>
           </div>
         ) : (
@@ -203,10 +234,13 @@ const DashboardPage = () => {
                 </div>
                 <div className="text-right">
                   <p className={`text-sm font-semibold ${
-                    parseFloat(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'
+                    tx.type.includes('DEPOSIT') || tx.type === 'ORDER_REFUND' ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {parseFloat(tx.amount) >= 0 ? '+' : ''}
-                    Ksh {Math.abs(parseFloat(tx.amount)).toLocaleString()}
+                    {tx.type.includes('DEPOSIT') || tx.type === 'ORDER_REFUND' ? '+' : '-'}
+                    {isUsdtTransaction(tx.type)
+                      ? `$${Math.abs(parseFloat(tx.usdtAmount || tx.amount)).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                      : `KES ${Math.abs(parseFloat(tx.amount)).toLocaleString()}`
+                    }
                   </p>
                   <Badge variant={getStatusVariant(tx.status)} className="text-[10px]">
                     {formatStatus(tx.status)}

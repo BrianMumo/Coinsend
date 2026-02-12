@@ -22,7 +22,7 @@ export interface UserBalance {
   currency: string;
 }
 
-export type BalanceTransactionType = 'DEPOSIT' | 'WITHDRAWAL' | 'ORDER_PAYMENT' | 'ORDER_REFUND' | 'ADJUSTMENT' | 'USDT_DEPOSIT' | 'USDT_WITHDRAWAL';
+export type BalanceTransactionType = 'DEPOSIT' | 'WITHDRAWAL' | 'ORDER_PAYMENT' | 'ORDER_REFUND' | 'ADJUSTMENT' | 'USDT_DEPOSIT' | 'USDT_WITHDRAWAL' | 'KES_WITHDRAWAL';
 export type BalanceTransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export interface BalanceTransaction {
@@ -31,6 +31,7 @@ export interface BalanceTransaction {
   status: BalanceTransactionStatus;
   currency?: string;
   amount: string;
+  usdtAmount?: string;
   balanceBefore: string;
   balanceAfter: string;
   reference: string | null;

@@ -317,6 +317,173 @@ router.get(
   })
 );
 
+// KES Withdrawals (conversions from USDT)
+router.get(
+  '/withdrawals/kes',
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { page = 1, limit = 20, status } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const where: any = { type: 'KES_WITHDRAWAL' };
+    if (status) where.status = status;
+
+    const [withdrawals, total] = await Promise.all([
+      prisma.balanceTransaction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: Number(limit),
+        include: {
+          userBalance: {
+            include: {
+              user: {
+                select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.balanceTransaction.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: withdrawals.map(w => ({
+        id: w.id,
+        userId: w.userBalance.user.id,
+        userEmail: w.userBalance.user.email,
+        userName: `${w.userBalance.user.firstName || ''} ${w.userBalance.user.lastName || ''}`.trim(),
+        userPhone: w.userBalance.user.phone,
+        usdtAmount: Math.abs(Number(w.amount)).toString(),
+        phoneNumber: w.phoneNumber,
+        description: w.description,
+        status: w.status,
+        reference: w.reference,
+        createdAt: w.createdAt,
+        completedAt: w.completedAt,
+      })),
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
+  })
+);
+
+// Complete KES withdrawal manually (if B2C callback fails)
+router.put(
+  '/withdrawals/:id/complete',
+  requireRole('SUPER_ADMIN', 'ADMIN'),
+  validate([
+    body('mpesaReceiptNumber').optional().trim(),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { id } = req.params;
+    const { mpesaReceiptNumber } = req.body;
+
+    const withdrawal = await prisma.balanceTransaction.findFirst({
+      where: { id, type: 'KES_WITHDRAWAL' },
+    });
+
+    if (!withdrawal) {
+      throw new AppError('Withdrawal not found', 404);
+    }
+
+    if (withdrawal.status !== 'PENDING') {
+      throw new AppError('Withdrawal is not pending', 400);
+    }
+
+    await prisma.balanceTransaction.update({
+      where: { id },
+      data: {
+        status: 'COMPLETED',
+        reference: mpesaReceiptNumber || withdrawal.reference,
+        description: `${withdrawal.description} - Manually completed by admin`,
+        completedAt: new Date(),
+      },
+    });
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.adminId,
+        action: 'KES_WITHDRAWAL_COMPLETED',
+        entityType: 'BalanceTransaction',
+        entityId: id,
+        details: { mpesaReceiptNumber },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Withdrawal marked as completed',
+    });
+  })
+);
+
+// Reject/Cancel KES withdrawal and refund USDT
+router.put(
+  '/withdrawals/:id/reject',
+  requireRole('SUPER_ADMIN', 'ADMIN'),
+  validate([
+    body('reason').notEmpty().withMessage('Rejection reason is required').trim(),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const withdrawal = await prisma.balanceTransaction.findFirst({
+      where: { id, type: 'KES_WITHDRAWAL' },
+      include: { userBalance: true },
+    });
+
+    if (!withdrawal) {
+      throw new AppError('Withdrawal not found', 404);
+    }
+
+    if (withdrawal.status !== 'PENDING') {
+      throw new AppError('Withdrawal is not pending', 400);
+    }
+
+    // Refund the USDT
+    const refundAmount = Math.abs(Number(withdrawal.amount));
+
+    await prisma.$transaction(async (tx) => {
+      await tx.userBalance.update({
+        where: { id: withdrawal.userBalanceId },
+        data: { usdtBalance: { increment: refundAmount } },
+      });
+
+      await tx.balanceTransaction.update({
+        where: { id },
+        data: {
+          status: 'CANCELLED',
+          description: `${withdrawal.description} - Rejected: ${reason}`,
+          completedAt: new Date(),
+        },
+      });
+    });
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.adminId,
+        action: 'KES_WITHDRAWAL_REJECTED',
+        entityType: 'BalanceTransaction',
+        entityId: id,
+        details: { reason, refundedAmount: refundAmount },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Withdrawal rejected and USDT refunded',
+    });
+  })
+);
+
 // Rates
 router.get(
   '/rates',

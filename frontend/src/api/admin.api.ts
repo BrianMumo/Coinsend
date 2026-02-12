@@ -154,6 +154,49 @@ export const adminDepositsApi = {
   },
 };
 
+// KES Withdrawals API (conversions from USDT)
+export interface KesWithdrawal {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  userPhone: string | null;
+  usdtAmount: string;
+  phoneNumber: string | null;
+  description: string | null;
+  status: string;
+  reference: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export const adminWithdrawalsApi = {
+  getKesWithdrawals: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<ApiResponse<KesWithdrawal[]> & { pagination: Pagination }> => {
+    const response = await adminApi.get('/admin/withdrawals/kes', { params });
+    return response.data;
+  },
+
+  completeWithdrawal: async (
+    id: string,
+    mpesaReceiptNumber?: string
+  ): Promise<ApiResponse<void>> => {
+    const response = await adminApi.put(`/admin/withdrawals/${id}/complete`, { mpesaReceiptNumber });
+    return response.data;
+  },
+
+  rejectWithdrawal: async (
+    id: string,
+    reason: string
+  ): Promise<ApiResponse<void>> => {
+    const response = await adminApi.put(`/admin/withdrawals/${id}/reject`, { reason });
+    return response.data;
+  },
+};
+
 export const adminRatesApi = {
   getAll: async (): Promise<ApiResponse<{ rates: ExchangeRate[] }>> => {
     const response = await adminApi.get('/admin/rates');

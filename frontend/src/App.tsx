@@ -19,6 +19,7 @@ const WalletPage = lazy(() => import('./pages/user/WalletPage'));
 // Admin pages
 const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
+const AdminTransactionsPage = lazy(() => import('./pages/admin/AdminTransactionsPage'));
 const AdminOrdersPage = lazy(() => import('./pages/admin/AdminOrdersPage'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 const AdminMpesaPage = lazy(() => import('./pages/admin/AdminMpesaPage'));
@@ -50,6 +51,7 @@ function App() {
         {/* Admin routes */}
         <Route path="/mumo/login" element={<AdminLoginPage />} />
         <Route path="/mumo" element={<AdminLayout><AdminDashboardPage /></AdminLayout>} />
+        <Route path="/mumo/transactions" element={<AdminLayout><AdminTransactionsPage /></AdminLayout>} />
         <Route path="/mumo/orders" element={<AdminLayout><AdminOrdersPage /></AdminLayout>} />
         <Route path="/mumo/users" element={<AdminLayout><AdminUsersPage /></AdminLayout>} />
         <Route path="/mumo/mpesa" element={<AdminLayout><AdminMpesaPage /></AdminLayout>} />
