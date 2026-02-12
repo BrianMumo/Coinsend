@@ -852,15 +852,7 @@ class BalanceService {
     kesAmount: number;
     rate: number;
   }> {
-    // Validate USDT amount
-    if (usdtAmount < 1) {
-      throw new AppError('Minimum withdrawal is 1 USDT', 400);
-    }
-    if (usdtAmount > 5000) {
-      throw new AppError('Maximum withdrawal is 5,000 USDT', 400);
-    }
-
-    // Get current USDT/KES sell rate
+    // Get current USDT/KES sell rate first
     const rateData = await rateService.getRateByPair('USDT_KES');
     if (!rateData) {
       throw new AppError('Exchange rate not available', 500);
@@ -869,12 +861,12 @@ class BalanceService {
     const rate = Number(rateData.sellRate);
     const kesAmount = Math.floor(usdtAmount * rate); // Round down to whole KES
 
-    // Validate KES amount against M-Pesa limits
-    if (kesAmount < 10) {
-      throw new AppError('Withdrawal amount too small (minimum KES 10)', 400);
+    // Validate KES amount (frontend sends KES converted to USDT)
+    if (kesAmount < 100) {
+      throw new AppError('Minimum withdrawal is KES 100', 400);
     }
-    if (kesAmount > 150000) {
-      throw new AppError('Withdrawal amount too large (maximum KES 150,000)', 400);
+    if (kesAmount > 250000) {
+      throw new AppError('Maximum withdrawal is KES 250,000', 400);
     }
 
     // Use transaction for atomic balance check and deduction
