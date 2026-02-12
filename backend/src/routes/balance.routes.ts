@@ -44,8 +44,8 @@ const transactionQueryValidation = [
 
 const kesWithdrawValidation = [
   body('amount')
-    .isFloat({ min: 1, max: 5000 })
-    .withMessage('Amount must be between 1 and 5,000 USDT'),
+    .isFloat({ min: 0.5, max: 2000 })
+    .withMessage('Amount must be between 0.5 and 2,000 USDT'),
   body('phoneNumber')
     .notEmpty()
     .withMessage('Phone number is required')
