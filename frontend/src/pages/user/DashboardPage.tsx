@@ -237,7 +237,8 @@ const DashboardPage = () => {
                     tx.type.includes('DEPOSIT') || tx.type === 'ORDER_REFUND' ? 'text-green-600' : 'text-red-600'
                   }`}>
                     {tx.type.includes('DEPOSIT') || tx.type === 'ORDER_REFUND' ? '+' : '-'}
-                    {isUsdtTransaction(tx.type)
+                    {/* Show as USDT only if usdtAmount is set OR currency is USDT */}
+                    {(tx.usdtAmount && parseFloat(tx.usdtAmount) > 0) || tx.currency === 'USDT'
                       ? `$${Math.abs(parseFloat(tx.usdtAmount || tx.amount)).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                       : `KES ${Math.abs(parseFloat(tx.amount)).toLocaleString()}`
                     }

@@ -246,20 +246,25 @@ const WalletPage = () => {
   };
 
   const formatTransactionAmount = (tx: BalanceTransaction) => {
-    const amount = Math.abs(parseFloat(tx.amount));
-    const isCredit = parseFloat(tx.amount) >= 0;
+    const isCredit = tx.type.includes('DEPOSIT') || tx.type === 'ORDER_REFUND';
 
-    // For USDT transactions, show USDT
-    if (tx.currency === 'USDT' || tx.type === 'USDT_DEPOSIT' || tx.type === 'USDT_WITHDRAWAL' || tx.type === 'KES_WITHDRAWAL') {
+    // Check if we have a valid USDT amount OR if the currency is explicitly USDT
+    const hasValidUsdtAmount = tx.usdtAmount && parseFloat(tx.usdtAmount) > 0;
+    const isUsdtCurrency = tx.currency === 'USDT';
+
+    if (hasValidUsdtAmount || isUsdtCurrency) {
+      // Use usdtAmount if available, otherwise use amount (for USDT currency transactions)
+      const usdtValue = hasValidUsdtAmount ? parseFloat(tx.usdtAmount!) : parseFloat(tx.amount);
       return {
-        text: `${isCredit ? '+' : '-'}${amount.toFixed(2)} USDT`,
+        text: `${isCredit ? '+' : '-'}$${Math.abs(usdtValue).toFixed(2)}`,
         isCredit,
       };
     }
 
-    // For KES transactions
+    // For KES transactions (including old USDT_DEPOSIT with KES amounts)
+    const kesAmount = Math.abs(parseFloat(tx.amount));
     return {
-      text: `${isCredit ? '+' : ''}KES ${amount.toLocaleString()}`,
+      text: `${isCredit ? '+' : '-'}KES ${kesAmount.toLocaleString()}`,
       isCredit,
     };
   };
