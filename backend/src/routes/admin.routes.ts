@@ -484,6 +484,107 @@ router.put(
   })
 );
 
+// ============ ADMIN USDT ADJUSTMENT ============
+
+// Adjust user's USDT balance (for corrections)
+router.post(
+  '/users/:userId/adjust-usdt',
+  requireRole('SUPER_ADMIN'),
+  validate([
+    body('amount').isFloat().withMessage('Amount is required'),
+    body('reason').notEmpty().withMessage('Reason is required').trim(),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { userId } = req.params;
+    const { amount, reason } = req.body;
+    const adjustmentAmount = parseFloat(amount);
+
+    // Find the user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    // Get or create user balance
+    let userBalance = await prisma.userBalance.findUnique({
+      where: { userId },
+    });
+
+    if (!userBalance) {
+      userBalance = await prisma.userBalance.create({
+        data: {
+          userId,
+          balance: 0,
+          usdtBalance: 0,
+          currency: 'KES',
+        },
+      });
+    }
+
+    const currentUsdtBalance = Number(userBalance.usdtBalance);
+    const newUsdtBalance = currentUsdtBalance + adjustmentAmount;
+
+    if (newUsdtBalance < 0) {
+      throw new AppError('Adjustment would result in negative balance', 400);
+    }
+
+    // Update balance and create transaction record
+    await prisma.$transaction(async (tx) => {
+      await tx.userBalance.update({
+        where: { userId },
+        data: { usdtBalance: newUsdtBalance },
+      });
+
+      await tx.balanceTransaction.create({
+        data: {
+          userBalanceId: userBalance!.id,
+          type: 'ADJUSTMENT',
+          status: 'COMPLETED',
+          currency: 'USDT',
+          amount: adjustmentAmount,
+          usdtAmount: Math.abs(adjustmentAmount),
+          balanceBefore: currentUsdtBalance,
+          balanceAfter: newUsdtBalance,
+          description: `Admin USDT adjustment: ${reason}`,
+          completedAt: new Date(),
+        },
+      });
+    });
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.adminId,
+        action: 'USDT_BALANCE_ADJUSTMENT',
+        entityType: 'UserBalance',
+        entityId: userBalance.id,
+        details: {
+          userId,
+          userEmail: user.email,
+          previousBalance: currentUsdtBalance,
+          adjustmentAmount,
+          newBalance: newUsdtBalance,
+          reason,
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `USDT balance adjusted by ${adjustmentAmount >= 0 ? '+' : ''}${adjustmentAmount}`,
+      data: {
+        userId,
+        previousBalance: currentUsdtBalance,
+        adjustmentAmount,
+        newBalance: newUsdtBalance,
+      },
+    });
+  })
+);
+
 // Rates
 router.get(
   '/rates',

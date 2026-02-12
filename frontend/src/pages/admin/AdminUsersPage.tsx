@@ -23,6 +23,7 @@ import {
   UserCheck,
   Shield,
   CreditCard,
+  DollarSign,
 } from 'lucide-react';
 import { useAdminAuthStore } from '../../store/adminAuthStore';
 
@@ -62,6 +63,10 @@ const AdminUsersPage = () => {
   // Credit deposit modal
   const [creditModalUser, setCreditModalUser] = useState<User | null>(null);
   const [creditForm, setCreditForm] = useState({ amount: '', txHash: '', usdtAmount: '' });
+
+  // USDT adjustment modal
+  const [adjustModalUser, setAdjustModalUser] = useState<User | null>(null);
+  const [adjustForm, setAdjustForm] = useState({ amount: '', reason: '' });
 
   const fetchUsers = async (page: number = 1) => {
     setIsLoading(true);
@@ -159,6 +164,31 @@ const AdminUsersPage = () => {
       fetchUsers(pagination.page);
     } catch (err: any) {
       setActionError(err.response?.data?.error?.message || 'Failed to credit deposit');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAdjustUsdt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustModalUser || !adjustForm.amount || !adjustForm.reason) return;
+    setActionLoading(true);
+    setActionError(null);
+
+    try {
+      const response = await adminUsersApi.adjustUsdtBalance(
+        adjustModalUser.id,
+        parseFloat(adjustForm.amount),
+        adjustForm.reason
+      );
+      if (response.success && response.data) {
+        setActionSuccess(`USDT balance adjusted: ${response.data.previousBalance} → ${response.data.newBalance}`);
+      }
+      setAdjustModalUser(null);
+      setAdjustForm({ amount: '', reason: '' });
+      fetchUsers(pagination.page);
+    } catch (err: any) {
+      setActionError(err.response?.data?.error?.message || 'Failed to adjust USDT balance');
     } finally {
       setActionLoading(false);
     }
@@ -436,6 +466,19 @@ const AdminUsersPage = () => {
                       Credit Deposit
                     </Button>
                   )}
+
+                  {/* Adjust USDT Balance - Super Admin Only */}
+                  {isSuperAdmin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-green-600 border-green-300"
+                      onClick={() => setAdjustModalUser(selectedUser)}
+                    >
+                      <DollarSign className="h-4 w-4 mr-1" />
+                      Adjust USDT Balance
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -566,6 +609,59 @@ const AdminUsersPage = () => {
                   onClick={() => {
                     setCreditModalUser(null);
                     setCreditForm({ amount: '', txHash: '', usdtAmount: '' });
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* USDT Adjustment Modal */}
+      {adjustModalUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-sm p-4">
+            <h3 className="font-bold mb-2">Adjust USDT Balance</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              User: {adjustModalUser.email}
+            </p>
+            <form onSubmit={handleAdjustUsdt} className="space-y-3">
+              <Input
+                label="USDT Amount"
+                type="number"
+                step="0.01"
+                placeholder="e.g. 9 or -5"
+                value={adjustForm.amount}
+                onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })}
+                required
+              />
+              <p className="text-xs text-gray-500">
+                Use positive numbers to add, negative to subtract
+              </p>
+              <Input
+                label="Reason"
+                placeholder="e.g. Correction for deposit #12345"
+                value={adjustForm.reason}
+                onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
+                required
+              />
+              <div className="flex gap-2 mt-4">
+                <Button
+                  type="submit"
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  isLoading={actionLoading}
+                  disabled={!adjustForm.amount || !adjustForm.reason}
+                >
+                  Adjust Balance
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setAdjustModalUser(null);
+                    setAdjustForm({ amount: '', reason: '' });
                   }}
                 >
                   Cancel

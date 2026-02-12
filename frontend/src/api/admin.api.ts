@@ -129,6 +129,19 @@ export const adminUsersApi = {
     });
     return response.data;
   },
+
+  // Adjust USDT balance (admin correction)
+  adjustUsdtBalance: async (
+    userId: string,
+    amount: number,
+    reason: string
+  ): Promise<ApiResponse<{ userId: string; previousBalance: number; adjustmentAmount: number; newBalance: number }>> => {
+    const response = await adminApi.post(`/admin/users/${userId}/adjust-usdt`, {
+      amount,
+      reason,
+    });
+    return response.data;
+  },
 };
 
 // USDT Deposits API
