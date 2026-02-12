@@ -14,6 +14,15 @@ export class RateService {
     return rates;
   }
 
+  // For admin panel - returns ALL rates including inactive
+  async getAllRatesForAdmin() {
+    const rates = await prisma.exchangeRate.findMany({
+      orderBy: { pair: 'asc' },
+    });
+
+    return rates;
+  }
+
   async getRateByPair(pair: string) {
     const rate = await prisma.exchangeRate.findUnique({
       where: { pair: pair.toUpperCase() },

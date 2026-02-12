@@ -589,7 +589,8 @@ router.post(
 router.get(
   '/rates',
   asyncHandler(async (req: AdminRequest, res: Response) => {
-    const rates = await rateService.getAllRates();
+    // Admin sees ALL rates including inactive
+    const rates = await rateService.getAllRatesForAdmin();
     res.json({
       success: true,
       data: { rates },

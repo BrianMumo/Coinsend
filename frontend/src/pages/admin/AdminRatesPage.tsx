@@ -32,12 +32,14 @@ const AdminRatesPage = () => {
 
   const fetchRates = async () => {
     try {
+      setError(null);
       const response = await adminRatesApi.getAll();
       if (response.success && response.data) {
         setRates(response.data.rates);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch rates:', err);
+      setError(err.response?.data?.error?.message || 'Failed to fetch rates');
     } finally {
       setIsLoading(false);
     }
