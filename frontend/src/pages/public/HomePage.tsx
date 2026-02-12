@@ -11,7 +11,6 @@ import {
   MessageCircle,
   Smartphone,
   ArrowDownLeft,
-  Clock,
   BadgeCheck,
   Banknote,
   Star,
