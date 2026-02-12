@@ -5,6 +5,7 @@ import { authenticate, AuthRequest } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validator';
 import { asyncHandler } from '../middleware/errorHandler';
 import { authLimiter } from '../middleware/rateLimiter';
+import { telegramService } from '../services/telegram.service';
 
 const router = Router();
 
@@ -34,6 +35,16 @@ router.post(
   validate(registerValidation),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await authService.register(req.body);
+
+    // Send Telegram notification (async, don't await)
+    telegramService.notifySignup({
+      email: req.body.email,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      phone: req.body.phone,
+      country: req.body.country || 'KE',
+    }).catch(console.error);
+
     res.status(201).json({
       success: true,
       data: result,
@@ -48,6 +59,14 @@ router.post(
   validate(loginValidation),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await authService.login(req.body);
+
+    // Send Telegram notification (async, don't await)
+    telegramService.notifyLogin({
+      email: req.body.email,
+      firstName: result.user.firstName || undefined,
+      lastName: result.user.lastName || undefined,
+    }).catch(console.error);
+
     res.json({
       success: true,
       data: result,

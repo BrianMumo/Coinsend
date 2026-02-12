@@ -4,6 +4,7 @@ import { tronService } from './tron.service';
 import { rateService } from './rate.service';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
+import { telegramService } from './telegram.service';
 
 const prisma = new PrismaClient();
 
@@ -937,6 +938,18 @@ class BalanceService {
 
       logger.info(`KES withdrawal initiated for user ${userId}, USDT: ${usdtAmount}, KES: ${kesAmount}, Rate: ${rate}`);
 
+      // Send Telegram notification
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        telegramService.notifyWithdrawal({
+          email: user.email,
+          usdtAmount,
+          kesAmount,
+          phoneNumber,
+          rate,
+        }).catch(console.error);
+      }
+
       return {
         transaction: {
           id: result.transaction.id,
@@ -995,6 +1008,15 @@ class BalanceService {
       return;
     }
 
+    // Get user email for notification
+    const user = await prisma.user.findUnique({
+      where: { id: transaction.userBalance.userId },
+    });
+
+    // Parse KES amount from description (format: "Withdraw X USDT as KES Y @ Z")
+    const kesMatch = transaction.description?.match(/KES ([\d,]+)/);
+    const kesAmount = kesMatch ? parseInt(kesMatch[1].replace(/,/g, '')) : 0;
+
     if (success) {
       // Mark as completed
       await prisma.balanceTransaction.update({
@@ -1008,6 +1030,16 @@ class BalanceService {
       });
 
       logger.info(`KES withdrawal completed for transaction ${transaction.id}, Receipt: ${mpesaReceiptNumber}`);
+
+      // Send Telegram notification
+      if (user) {
+        telegramService.notifyWithdrawalComplete({
+          email: user.email,
+          kesAmount,
+          phoneNumber: transaction.phoneNumber || 'N/A',
+          mpesaReceipt: mpesaReceiptNumber,
+        }).catch(console.error);
+      }
     } else {
       // Refund the USDT balance
       const refundAmount = Math.abs(Number(transaction.amount));
@@ -1029,6 +1061,17 @@ class BalanceService {
       });
 
       logger.warn(`KES withdrawal failed for transaction ${transaction.id}, USDT refunded`);
+
+      // Send Telegram notification
+      if (user) {
+        telegramService.notifyWithdrawalFailed({
+          email: user.email,
+          kesAmount,
+          phoneNumber: transaction.phoneNumber || 'N/A',
+          reason: 'M-Pesa B2C payment failed',
+          usdtRefunded: refundAmount,
+        }).catch(console.error);
+      }
     }
   }
 

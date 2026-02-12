@@ -1,6 +1,7 @@
 import { config } from '../config/env';
 import { logger } from '../utils/logger';
 import { PrismaClient } from '@prisma/client';
+import { telegramService } from './telegram.service';
 
 // TronWeb doesn't have proper TypeScript types
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -755,6 +756,18 @@ class TronService {
       });
 
       logger.info(`Successfully credited ${transferAmount} USDT to user ${userId} (tx: ${txHash})`);
+
+      // Send Telegram notification
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        const userBalance = await prisma.userBalance.findUnique({ where: { userId } });
+        telegramService.notifyDeposit({
+          email: user.email,
+          usdtAmount: transferAmount,
+          txHash,
+          newBalance: Number(userBalance?.usdtBalance || 0),
+        }).catch(console.error);
+      }
 
       return {
         success: true,
