@@ -92,10 +92,10 @@ const WalletPage = () => {
 
       if (ratesResponse.success && ratesResponse.data) {
         const rates = ratesResponse.data.rates || ratesResponse.data;
-        const usdtKes = Array.isArray(rates) ? rates.find((r: { pair: string; sellRate: string | number }) => r.pair === 'USDT_KES') : null;
+        const usdtKes = Array.isArray(rates) ? rates.find((r: { pair: string; buyRate: string | number }) => r.pair === 'USDT_KES') : null;
         if (usdtKes) {
-          // Use sellRate for withdrawals (selling USDT for KES)
-          setUsdtRate(parseFloat(usdtKes.sellRate.toString()));
+          // Use buyRate - when user sells USDT, exchange buys at this rate
+          setUsdtRate(parseFloat(usdtKes.buyRate.toString()));
         }
       }
     } catch (err: unknown) {

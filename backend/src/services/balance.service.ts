@@ -852,13 +852,13 @@ class BalanceService {
     kesAmount: number;
     rate: number;
   }> {
-    // Get current USDT/KES sell rate first
+    // Get current USDT/KES buy rate (what we pay when user sells USDT)
     const rateData = await rateService.getRateByPair('USDT_KES');
     if (!rateData) {
       throw new AppError('Exchange rate not available', 500);
     }
 
-    const rate = Number(rateData.sellRate);
+    const rate = Number(rateData.buyRate);
     const kesAmount = Math.floor(usdtAmount * rate); // Round down to whole KES
 
     // Validate KES amount (frontend sends KES converted to USDT)

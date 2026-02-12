@@ -46,13 +46,13 @@ const DashboardPage = () => {
         });
       }
 
-      // Get USDT/KES rate
+      // Get USDT/KES rate - use buyRate (what exchange pays when user sells USDT)
       if (ratesResponse.success && ratesResponse.data?.rates) {
         const usdtKesRate = ratesResponse.data.rates.find(
           (r) => r.pair === 'USDT_KES' && r.isActive
         );
         if (usdtKesRate) {
-          setUsdtRate(Number(usdtKesRate.sellRate));
+          setUsdtRate(Number(usdtKesRate.buyRate));
         }
       }
     } catch (err) {
