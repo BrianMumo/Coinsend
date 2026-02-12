@@ -19,7 +19,6 @@ import {
   Copy,
   Eye,
   EyeOff,
-  DollarSign,
 } from 'lucide-react';
 
 type TabType = 'all' | 'deposits' | 'withdrawals';
@@ -145,25 +144,25 @@ const WalletPage = () => {
     }
   };
 
-  // New withdrawal handler - withdraws USDT as KES to M-Pesa
+  // New withdrawal handler - withdraws KES from balance to M-Pesa
   const handleWithdrawToKes = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(null);
 
-    const usdtAmount = parseFloat(withdrawAmount);
-    const currentUsdtBalance = parseFloat(data?.balance?.usdtBalance || '0');
+    const kesAmount = parseFloat(withdrawAmount);
+    const currentKesBalance = parseFloat(data?.balance?.usdtBalance || '0') * usdtRate;
 
-    if (isNaN(usdtAmount) || usdtAmount < 1) {
-      setFormError('Minimum withdrawal is 1 USDT');
+    if (isNaN(kesAmount) || kesAmount < 100) {
+      setFormError('Minimum withdrawal is KES 100');
       return;
     }
-    if (usdtAmount > 5000) {
-      setFormError('Maximum withdrawal is 5,000 USDT');
+    if (kesAmount > 250000) {
+      setFormError('Maximum withdrawal is KES 250,000');
       return;
     }
-    if (usdtAmount > currentUsdtBalance) {
-      setFormError('Insufficient USDT balance');
+    if (kesAmount > currentKesBalance) {
+      setFormError('Insufficient balance');
       return;
     }
     if (!withdrawPhone) {
@@ -171,11 +170,13 @@ const WalletPage = () => {
       return;
     }
 
+    // Convert KES to USDT for API call
+    const usdtAmount = kesAmount / usdtRate;
+
     try {
       setIsSubmitting(true);
       const response = await balanceApi.withdrawToKes(usdtAmount, withdrawPhone);
       if (response.success && response.data) {
-        const kesAmount = parseFloat(response.data.kesAmount);
         setFormSuccess(`Sending KES ${kesAmount.toLocaleString()} to ${withdrawPhone}. You'll receive it shortly!`);
         setWithdrawAmount('');
         setTimeout(() => {
@@ -302,12 +303,10 @@ const WalletPage = () => {
 
   const usdtBalance = parseFloat(data?.balance?.usdtBalance || '0');
   const kesEquivalent = usdtBalance * usdtRate;
-  const withdrawUsdtAmount = parseFloat(withdrawAmount || '0');
-  const withdrawKesAmount = withdrawUsdtAmount * usdtRate;
 
   return (
     <div className="space-y-4">
-      {/* USDT Balance Card */}
+      {/* KES Balance Card */}
       <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
@@ -316,8 +315,8 @@ const WalletPage = () => {
         <div className="relative">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              <span className="text-sm font-medium">USDT Balance</span>
+              <span className="text-lg">💰</span>
+              <span className="text-sm font-medium">KES Balance</span>
             </div>
             <button
               onClick={() => setShowBalance(!showBalance)}
@@ -332,15 +331,15 @@ const WalletPage = () => {
           </div>
 
           <p className="text-3xl font-bold mb-1">
-            ${showBalance
-              ? usdtBalance.toFixed(2)
-              : '••••••'
+            {showBalance
+              ? `KES ${kesEquivalent.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+              : 'KES ••••••'
             }
           </p>
 
           {showBalance && usdtRate > 0 && (
             <p className="text-sm text-green-100 mb-4">
-              ≈ KES {kesEquivalent.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              ≈ ${usdtBalance.toFixed(2)} USDT
             </p>
           )}
 
@@ -354,7 +353,7 @@ const WalletPage = () => {
             </button>
             <button
               onClick={() => setShowWithdrawModal(true)}
-              disabled={usdtBalance < 1}
+              disabled={kesEquivalent < 100}
               className="flex-1 bg-white/20 hover:bg-white/30 disabled:opacity-50 text-white py-2.5 px-4 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors"
             >
               <ArrowUpRight className="h-4 w-4" />
@@ -608,42 +607,27 @@ const WalletPage = () => {
             {formError && <Alert variant="error" className="mb-4 text-sm">{formError}</Alert>}
             {formSuccess && <Alert variant="success" className="mb-4 text-sm">{formSuccess}</Alert>}
 
-            {/* Available USDT Balance */}
-            <div className="bg-blue-50 rounded-xl p-3 mb-4 text-center">
-              <p className="text-xs text-blue-600">Available USDT</p>
-              <p className="text-xl font-bold text-blue-800">
-                ${usdtBalance.toFixed(2)}
+            {/* Available KES Balance */}
+            <div className="bg-green-50 rounded-xl p-3 mb-4 text-center">
+              <p className="text-xs text-green-600">Available Balance</p>
+              <p className="text-xl font-bold text-green-800">
+                KES {kesEquivalent.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </div>
 
             <form onSubmit={handleWithdrawToKes} className="space-y-4">
               <Input
-                label="USDT Amount to Withdraw"
+                label="Amount to Withdraw (KES)"
                 type="number"
-                step="0.01"
-                min="1"
-                max={Math.min(5000, usdtBalance)}
+                step="1"
+                min="100"
+                max={Math.min(250000, kesEquivalent)}
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder="Enter USDT amount"
+                placeholder="Enter KES amount"
                 required
                 disabled={isSubmitting}
               />
-
-              {/* KES Preview */}
-              {withdrawUsdtAmount > 0 && usdtRate > 0 && (
-                <div className="bg-green-50 rounded-xl p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-green-600">You'll receive</span>
-                    <span className="font-bold text-green-800">
-                      KES {withdrawKesAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-green-600 mt-1">
-                    Rate: 1 USDT = KES {usdtRate.toLocaleString()}
-                  </p>
-                </div>
-              )}
 
               <Input
                 label="M-Pesa Phone Number"
@@ -656,7 +640,7 @@ const WalletPage = () => {
               />
 
               <p className="text-xs text-gray-500 text-center">
-                Min: 1 USDT • Max: 5,000 USDT
+                Min: KES 100 • Max: KES 250,000
               </p>
 
               <div className="flex gap-3">

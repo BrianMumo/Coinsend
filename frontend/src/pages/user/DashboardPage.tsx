@@ -106,7 +106,7 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* USDT Balance Card */}
+      {/* KES Balance Card */}
       <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white relative overflow-hidden">
         {/* Decorative pattern */}
         <div className="absolute inset-0 opacity-10">
@@ -115,15 +115,15 @@ const DashboardPage = () => {
 
         <div className="relative">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">💵</span>
-            <span className="text-sm font-medium">USDT Balance</span>
+            <span className="text-lg">💰</span>
+            <span className="text-sm font-medium">KES Balance</span>
           </div>
 
           <div className="flex items-center gap-3 mb-1">
             <p className="text-3xl font-bold">
-              ${showBalance
-                ? parseFloat(usdtBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : '••••••'
+              {showBalance
+                ? `KES ${(parseFloat(usdtBalance) * usdtRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                : 'KES ••••••'
               }
             </p>
             <button
@@ -138,11 +138,11 @@ const DashboardPage = () => {
             </button>
           </div>
 
-          {/* KES Equivalent */}
+          {/* USDT Equivalent */}
           <p className="text-sm text-green-100 mb-4">
             {showBalance
-              ? `≈ KES ${(parseFloat(usdtBalance) * usdtRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-              : '≈ KES ••••••'
+              ? `≈ $${parseFloat(usdtBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
+              : '≈ $•••• USDT'
             }
           </p>
 
