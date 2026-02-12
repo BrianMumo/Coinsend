@@ -21,8 +21,8 @@ const WHATSAPP_NUMBER = '+254768294351';
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`;
 
 const HomePage = () => {
-  const [sellRate, setSellRate] = useState<number | null>(null);
-  const [buyRate, setBuyRate] = useState<number | null>(null);
+  const [sellRate, setSellRate] = useState<number>(130); // Default fallback
+  const [buyRate, setBuyRate] = useState<number>(132); // Default fallback
 
   useEffect(() => {
     const fetchRates = async () => {
@@ -38,6 +38,7 @@ const HomePage = () => {
           }
         }
       } catch (err) {
+        // Keep default fallback rates on error
         console.error('Failed to fetch rates:', err);
       }
     };
@@ -98,7 +99,7 @@ const HomePage = () => {
             <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto">
               <div className="text-center">
                 <p className="text-2xl md:text-3xl font-bold text-white">
-                  {sellRate ? sellRate.toFixed(1) : '---'}
+                  {sellRate.toFixed(1)}
                 </p>
                 <p className="text-xs text-gray-400">USDT/KES Rate</p>
               </div>
@@ -260,7 +261,7 @@ const HomePage = () => {
                   <span className="text-primary-100 text-sm">USDT → KES</span>
                   <span className="bg-green-500/20 text-green-300 text-xs px-2 py-0.5 rounded-full">Sell</span>
                 </div>
-                <p className="text-3xl font-bold">{sellRate ? sellRate.toFixed(2) : '---'}</p>
+                <p className="text-3xl font-bold">{sellRate.toFixed(2)}</p>
                 <p className="text-primary-200 text-sm mt-1">per USDT</p>
               </div>
 
@@ -269,7 +270,7 @@ const HomePage = () => {
                   <span className="text-primary-100 text-sm">KES → USDT</span>
                   <span className="bg-blue-500/20 text-blue-300 text-xs px-2 py-0.5 rounded-full">Buy</span>
                 </div>
-                <p className="text-3xl font-bold">{buyRate ? buyRate.toFixed(2) : '---'}</p>
+                <p className="text-3xl font-bold">{buyRate.toFixed(2)}</p>
                 <p className="text-primary-200 text-sm mt-1">per USDT</p>
               </div>
             </div>
