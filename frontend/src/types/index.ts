@@ -7,6 +7,7 @@ export interface User {
   lastName: string | null;
   country: string;
   kycStatus: KycStatus;
+  isActive?: boolean;
   createdAt?: string;
   lastLoginAt?: string;
   balance?: UserBalance | null;

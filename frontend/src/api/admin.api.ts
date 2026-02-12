@@ -94,6 +94,64 @@ export const adminUsersApi = {
     const response = await adminApi.get(`/admin/users/${id}`);
     return response.data;
   },
+
+  // Suspend or activate user
+  updateStatus: async (
+    id: string,
+    isActive: boolean,
+    reason?: string
+  ): Promise<ApiResponse<{ user: User }>> => {
+    const response = await adminApi.put(`/admin/users/${id}/status`, { isActive, reason });
+    return response.data;
+  },
+
+  // Update KYC status
+  updateKycStatus: async (
+    id: string,
+    kycStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED',
+    notes?: string
+  ): Promise<ApiResponse<{ user: User }>> => {
+    const response = await adminApi.put(`/admin/users/${id}/kyc`, { kycStatus, notes });
+    return response.data;
+  },
+
+  // Credit deposit manually
+  creditDeposit: async (
+    userId: string,
+    amount: number,
+    txHash: string,
+    usdtAmount: number
+  ): Promise<ApiResponse<{ userId: string; newBalance: number }>> => {
+    const response = await adminApi.post(`/admin/users/${userId}/credit-deposit`, {
+      amount,
+      txHash,
+      usdtAmount,
+    });
+    return response.data;
+  },
+};
+
+// USDT Deposits API
+export interface UsdtDeposit {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  amount: string;
+  txHash: string | null;
+  status: string;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export const adminDepositsApi = {
+  getUsdtDeposits: async (params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<UsdtDeposit[]> & { pagination: Pagination }> => {
+    const response = await adminApi.get('/admin/deposits/usdt', { params });
+    return response.data;
+  },
 };
 
 export const adminRatesApi = {

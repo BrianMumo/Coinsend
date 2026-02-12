@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -18,7 +17,6 @@ import {
   Wallet,
   DollarSign,
   Search,
-  Phone,
   CheckCircle,
   XCircle,
   Clock,
@@ -26,6 +24,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   RotateCcw,
+  Filter,
+  X,
 } from 'lucide-react';
 
 const AdminMpesaPage = () => {
@@ -44,6 +44,7 @@ const AdminMpesaPage = () => {
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   // B2C Payment form state
   const [showB2CForm, setShowB2CForm] = useState(false);
@@ -57,7 +58,6 @@ const AdminMpesaPage = () => {
 
   // Pending balance transactions state
   const [pendingBalanceTx, setPendingBalanceTx] = useState<PendingBalanceTransaction[]>([]);
-  const [isLoadingPendingTx, setIsLoadingPendingTx] = useState(true);
   const [completingTxId, setCompletingTxId] = useState<string | null>(null);
 
   // Reversal state
@@ -66,6 +66,9 @@ const AdminMpesaPage = () => {
 
   // Complete transaction modal state
   const [completeModalTxId, setCompleteModalTxId] = useState<string | null>(null);
+
+  // Selected transaction for detail view
+  const [selectedTx, setSelectedTx] = useState<MpesaTransaction | null>(null);
 
   // Messages
   const [error, setError] = useState<string | null>(null);
@@ -88,15 +91,12 @@ const AdminMpesaPage = () => {
   // Fetch pending balance transactions
   const fetchPendingBalanceTx = async () => {
     try {
-      setIsLoadingPendingTx(true);
       const response = await adminBalanceApi.getPendingTransactions();
       if (response.success && response.data) {
         setPendingBalanceTx(response.data.transactions);
       }
     } catch (err) {
       console.error('Failed to fetch pending balance transactions:', err);
-    } finally {
-      setIsLoadingPendingTx(false);
     }
   };
 
@@ -122,7 +122,7 @@ const AdminMpesaPage = () => {
     }
   };
 
-  // Refresh balance (trigger query to Safaricom)
+  // Refresh balance
   const handleRefreshBalance = async () => {
     setIsRefreshingBalance(true);
     setError(null);
@@ -131,8 +131,7 @@ const AdminMpesaPage = () => {
     try {
       const response = await adminMpesaApi.refreshBalance();
       if (response.success) {
-        setSuccess('Balance query initiated. Please wait a moment and refresh the page.');
-        // Wait 5 seconds and refetch
+        setSuccess('Balance query initiated');
         setTimeout(() => {
           fetchBalance();
           setSuccess(null);
@@ -183,10 +182,9 @@ const AdminMpesaPage = () => {
       });
 
       if (response.success) {
-        setSuccess(`B2C payment initiated successfully. Conversation ID: ${response.data?.conversationId}`);
+        setSuccess(`B2C payment initiated successfully`);
         setB2cForm({ phoneNumber: '', amount: '', commandId: 'BusinessPayment', remarks: '' });
         setShowB2CForm(false);
-        // Refresh transactions after a delay
         setTimeout(() => fetchTransactions(), 3000);
       }
     } catch (err: any) {
@@ -214,8 +212,7 @@ const AdminMpesaPage = () => {
       );
 
       if (response.success) {
-        setSuccess(`Reversal initiated successfully. Conversation ID: ${response.data?.conversationId}. Please wait for the reversal to be processed.`);
-        // Refresh transactions after a delay
+        setSuccess(`Reversal initiated successfully`);
         setTimeout(() => fetchTransactions(), 5000);
       }
     } catch (err: any) {
@@ -225,7 +222,6 @@ const AdminMpesaPage = () => {
     }
   };
 
-  // Check if a transaction can be reversed
   const canReverse = (tx: MpesaTransaction): boolean => {
     return (
       tx.transactionType === 'B2C_PAYMENT' &&
@@ -251,40 +247,29 @@ const AdminMpesaPage = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: 'success' | 'warning' | 'error' | 'default'; icon: typeof CheckCircle }> = {
-      SUCCESS: { variant: 'success', icon: CheckCircle },
-      PENDING: { variant: 'warning', icon: Clock },
-      FAILED: { variant: 'error', icon: XCircle },
-      TIMEOUT: { variant: 'error', icon: AlertTriangle },
+    const config: Record<string, { variant: 'completed' | 'processing' | 'failed' | 'default'; icon: typeof CheckCircle }> = {
+      SUCCESS: { variant: 'completed', icon: CheckCircle },
+      PENDING: { variant: 'processing', icon: Clock },
+      FAILED: { variant: 'failed', icon: XCircle },
+      TIMEOUT: { variant: 'failed', icon: AlertTriangle },
     };
     const { variant, icon: Icon } = config[status] || { variant: 'default' as const, icon: Clock };
     return (
-      <Badge variant={variant} className="flex items-center gap-1">
+      <Badge variant={variant} className="flex items-center gap-1 text-[10px]">
         <Icon className="h-3 w-3" />
         {status}
       </Badge>
     );
   };
 
-  const getTypeBadge = (type: string, isReversed?: boolean) => {
+  const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       C2B_STK_PUSH: 'STK Push',
-      B2C_PAYMENT: 'B2C Payment',
-      BALANCE_QUERY: 'Balance Query',
+      B2C_PAYMENT: 'B2C',
+      BALANCE_QUERY: 'Balance',
       REVERSAL: 'Reversal',
     };
-    return (
-      <div className="flex flex-col gap-1">
-        <Badge variant={type === 'REVERSAL' ? 'warning' : 'default'}>
-          {labels[type] || type}
-        </Badge>
-        {isReversed && (
-          <Badge variant="error" className="text-xs">
-            REVERSED
-          </Badge>
-        )}
-      </div>
-    );
+    return labels[type] || type;
   };
 
   const typeOptions = [
@@ -310,274 +295,203 @@ const AdminMpesaPage = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageTitle
         title="M-Pesa Management"
         description="View paybill balance, make B2C payments, and track M-Pesa transactions."
       />
 
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">M-Pesa</h1>
+        <p className="text-sm text-gray-500">Payments & Balance</p>
+      </div>
+
       {success && <Alert variant="success">{success}</Alert>}
       {error && <Alert variant="error">{error}</Alert>}
 
-      {/* Balance Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Wallet className="h-5 w-5 text-primary-600" />
-              Working Balance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingBalance ? (
-              <Spinner />
-            ) : (
-              <>
-                <p className="text-3xl font-bold text-gray-900">
-                  {balance?.workingBalance !== null
-                    ? formatCurrency(balance?.workingBalance || 0, 'KES')
-                    : 'N/A'}
-                </p>
-                {balance?.lastUpdated && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Last updated: {formatDate(balance.lastUpdated)}
-                  </p>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+      {/* Balance Cards - Compact */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+              <Wallet className="h-4 w-4 text-primary-600" />
+            </div>
+            <span className="text-xs text-gray-500">Working</span>
+          </div>
+          {isLoadingBalance ? (
+            <Spinner size="sm" />
+          ) : (
+            <p className="text-lg font-bold text-gray-900">
+              {balance?.workingBalance !== null
+                ? formatCurrency(balance?.workingBalance || 0, 'KES')
+                : 'N/A'}
+            </p>
+          )}
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <DollarSign className="h-5 w-5 text-green-600" />
-              Utility Balance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingBalance ? (
-              <Spinner />
-            ) : (
-              <p className="text-3xl font-bold text-gray-900">
-                {balance?.utilityBalance !== null
-                  ? formatCurrency(balance?.utilityBalance || 0, 'KES')
-                  : 'N/A'}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-green-600" />
+            </div>
+            <span className="text-xs text-gray-500">Utility</span>
+          </div>
+          {isLoadingBalance ? (
+            <Spinner size="sm" />
+          ) : (
+            <p className="text-lg font-bold text-gray-900">
+              {balance?.utilityBalance !== null
+                ? formatCurrency(balance?.utilityBalance || 0, 'KES')
+                : 'N/A'}
+            </p>
+          )}
+        </div>
+      </div>
 
-        <Card>
-          <CardContent className="pt-6 space-y-3">
-            <Button
-              onClick={handleRefreshBalance}
-              isLoading={isRefreshingBalance}
-              className="w-full"
-              variant="outline"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh Balance
-            </Button>
-
-            {isSuperAdmin && (
-              <Button
-                onClick={() => setShowB2CForm(!showB2CForm)}
-                className="w-full"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                {showB2CForm ? 'Cancel' : 'Make B2C Payment'}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <Button
+          onClick={handleRefreshBalance}
+          isLoading={isRefreshingBalance}
+          variant="outline"
+          size="sm"
+          className="flex-1"
+        >
+          <RefreshCw className="h-4 w-4 mr-1" />
+          Refresh
+        </Button>
+        {isSuperAdmin && (
+          <Button
+            onClick={() => setShowB2CForm(!showB2CForm)}
+            size="sm"
+            className="flex-1"
+          >
+            <Send className="h-4 w-4 mr-1" />
+            B2C Pay
+          </Button>
+        )}
       </div>
 
       {/* B2C Payment Form */}
       {showB2CForm && isSuperAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Initiate B2C Payment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleB2CSubmit} className="space-y-4 max-w-md">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Phone className="h-4 w-4 inline mr-1" />
-                  Phone Number
-                </label>
-                <Input
-                  type="tel"
-                  placeholder="0712345678"
-                  value={b2cForm.phoneNumber}
-                  onChange={(e) => setB2cForm({ ...b2cForm, phoneNumber: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Amount (KES)
-                </label>
-                <Input
-                  type="number"
-                  min="10"
-                  max="150000"
-                  placeholder="1000"
-                  value={b2cForm.amount}
-                  onChange={(e) => setB2cForm({ ...b2cForm, amount: e.target.value })}
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">Min: KES 10, Max: KES 150,000</p>
-              </div>
-
-              <Select
-                label="Payment Type"
-                options={commandIdOptions}
-                value={b2cForm.commandId}
-                onChange={(e) => setB2cForm({ ...b2cForm, commandId: e.target.value as any })}
-              />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Remarks (Optional)
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Payment for order #123"
-                  maxLength={100}
-                  value={b2cForm.remarks}
-                  onChange={(e) => setB2cForm({ ...b2cForm, remarks: e.target.value })}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button type="submit" isLoading={isSubmittingB2C}>
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Payment
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setShowB2CForm(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-xl p-4">
+          <h3 className="font-semibold mb-3">B2C Payment</h3>
+          <form onSubmit={handleB2CSubmit} className="space-y-3">
+            <Input
+              type="tel"
+              placeholder="Phone (0712345678)"
+              value={b2cForm.phoneNumber}
+              onChange={(e) => setB2cForm({ ...b2cForm, phoneNumber: e.target.value })}
+              required
+            />
+            <Input
+              type="number"
+              min="10"
+              max="150000"
+              placeholder="Amount (KES)"
+              value={b2cForm.amount}
+              onChange={(e) => setB2cForm({ ...b2cForm, amount: e.target.value })}
+              required
+            />
+            <Select
+              options={commandIdOptions}
+              value={b2cForm.commandId}
+              onChange={(e) => setB2cForm({ ...b2cForm, commandId: e.target.value as any })}
+            />
+            <Input
+              type="text"
+              placeholder="Remarks (optional)"
+              maxLength={100}
+              value={b2cForm.remarks}
+              onChange={(e) => setB2cForm({ ...b2cForm, remarks: e.target.value })}
+            />
+            <div className="flex gap-2">
+              <Button type="submit" isLoading={isSubmittingB2C} className="flex-1">
+                Send
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setShowB2CForm(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </div>
       )}
 
-      {/* Pending Balance Transactions */}
-      {(isLoadingPendingTx || pendingBalanceTx.length > 0) && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-800">
-              <AlertTriangle className="h-5 w-5" />
-              Pending Balance Transactions ({pendingBalanceTx.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingPendingTx ? (
-              <div className="flex justify-center py-4">
-                <Spinner />
+      {/* Pending Balance Transactions Alert */}
+      {pendingBalanceTx.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600" />
+            <span className="font-semibold text-yellow-800">
+              {pendingBalanceTx.length} Pending Transactions
+            </span>
+          </div>
+          <div className="space-y-2">
+            {pendingBalanceTx.slice(0, 3).map((tx) => (
+              <div
+                key={tx.id}
+                className="bg-white rounded-lg p-3 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    tx.type === 'DEPOSIT' ? 'bg-green-100' : 'bg-red-100'
+                  }`}>
+                    {tx.type === 'DEPOSIT' ? (
+                      <ArrowDownLeft className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <ArrowUpRight className="h-4 w-4 text-red-600" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{tx.userBalance.user.email}</p>
+                    <p className="text-xs text-gray-500">
+                      {formatCurrency(Math.abs(parseFloat(tx.amount)), 'KES')}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setCompleteModalTxId(tx.id)}
+                  isLoading={completingTxId === tx.id}
+                  disabled={completingTxId !== null}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </Button>
               </div>
-            ) : (
-            <>
-            <p className="text-sm text-yellow-700 mb-4">
-              These transactions need manual reconciliation. Verify payment was received before marking as complete.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-yellow-100">
-                    <th className="text-left py-3 px-4 font-medium">Date</th>
-                    <th className="text-left py-3 px-4 font-medium">Type</th>
-                    <th className="text-left py-3 px-4 font-medium">User</th>
-                    <th className="text-left py-3 px-4 font-medium">Phone</th>
-                    <th className="text-right py-3 px-4 font-medium">Amount</th>
-                    <th className="text-left py-3 px-4 font-medium">Reference</th>
-                    <th className="text-left py-3 px-4 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingBalanceTx.map((tx) => (
-                    <tr key={tx.id} className="border-b hover:bg-yellow-100">
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {formatDate(tx.createdAt)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge
-                          variant={tx.type === 'DEPOSIT' ? 'success' : tx.type === 'WITHDRAWAL' ? 'error' : 'default'}
-                          className="flex items-center gap-1 w-fit"
-                        >
-                          {tx.type === 'DEPOSIT' ? (
-                            <ArrowDownLeft className="h-3 w-3" />
-                          ) : (
-                            <ArrowUpRight className="h-3 w-3" />
-                          )}
-                          {tx.type}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div>{tx.userBalance.user.email}</div>
-                        <div className="text-xs text-gray-500">
-                          {tx.userBalance.user.firstName} {tx.userBalance.user.lastName}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        {tx.phoneNumber || tx.userBalance.user.phone || '-'}
-                      </td>
-                      <td className="py-3 px-4 text-right font-medium">
-                        {formatCurrency(Math.abs(parseFloat(tx.amount)), 'KES')}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs max-w-[200px] truncate">
-                        {tx.reference || '-'}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Button
-                          size="sm"
-                          onClick={() => setCompleteModalTxId(tx.id)}
-                          isLoading={completingTxId === tx.id}
-                          disabled={completingTxId !== null}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Complete
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            </>
-            )}
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Transaction History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Filters */}
-          <div className="flex flex-wrap gap-4 mb-4">
-            <div className="w-40">
+      <div className="bg-white rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Transactions</h3>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`p-2 rounded-lg transition-colors ${showFilters ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-600'}`}
+          >
+            <Filter className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="p-4 border-b border-gray-100 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
               <Select
                 options={typeOptions}
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
               />
-            </div>
-
-            <div className="w-40">
               <Select
                 options={statusOptions}
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
               />
             </div>
-
-            <div className="flex gap-2 flex-1 max-w-md">
+            <div className="flex gap-2">
               <Input
                 type="text"
                 placeholder="Search phone or receipt..."
@@ -590,104 +504,77 @@ const AdminMpesaPage = () => {
               </Button>
             </div>
           </div>
+        )}
 
-          {/* Table */}
-          {isLoadingTransactions ? (
-            <div className="flex justify-center py-8">
-              <Spinner size="lg" />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th className="text-left py-3 px-4 font-medium">Date</th>
-                    <th className="text-left py-3 px-4 font-medium">Type</th>
-                    <th className="text-left py-3 px-4 font-medium">Phone</th>
-                    <th className="text-right py-3 px-4 font-medium">Amount</th>
-                    <th className="text-left py-3 px-4 font-medium">Receipt</th>
-                    <th className="text-left py-3 px-4 font-medium">Status</th>
-                    <th className="text-left py-3 px-4 font-medium">Initiated By</th>
-                    {isSuperAdmin && <th className="text-left py-3 px-4 font-medium">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => (
-                    <tr key={tx.id} className={`border-b hover:bg-gray-50 ${tx.isReversed ? 'bg-red-50' : ''}`}>
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {formatDate(tx.createdAt)}
-                      </td>
-                      <td className="py-3 px-4">
-                        {getTypeBadge(tx.transactionType, tx.isReversed)}
-                      </td>
-                      <td className="py-3 px-4">
-                        {tx.phoneNumber || '-'}
-                        {tx.receiverPartyPublicName && (
-                          <div className="text-xs text-gray-500">
-                            {tx.receiverPartyPublicName}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right font-medium">
-                        {tx.transactionType !== 'BALANCE_QUERY'
-                          ? formatCurrency(tx.amount, 'KES')
-                          : '-'}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs">
-                        {tx.mpesaReceiptNumber || '-'}
-                      </td>
-                      <td className="py-3 px-4">
-                        {getStatusBadge(tx.status)}
-                      </td>
-                      <td className="py-3 px-4 text-xs">
-                        {tx.initiatedBy
-                          ? `${tx.initiatedBy.firstName} ${tx.initiatedBy.lastName}`
-                          : '-'}
-                      </td>
-                      {isSuperAdmin && (
-                        <td className="py-3 px-4">
-                          {canReverse(tx) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 border-red-300 hover:bg-red-50"
-                              onClick={() => setReversalModalTx(tx)}
-                              isLoading={reversingTxId === tx.id}
-                              disabled={reversingTxId !== null}
-                            >
-                              <RotateCcw className="h-3 w-3 mr-1" />
-                              Reverse
-                            </Button>
-                          )}
-                        </td>
+        {/* Transactions List */}
+        {isLoadingTransactions ? (
+          <div className="flex justify-center py-8">
+            <Spinner size="lg" />
+          </div>
+        ) : transactions.length === 0 ? (
+          <p className="text-center text-gray-500 py-8">No transactions found</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {transactions.map((tx) => (
+              <button
+                key={tx.id}
+                onClick={() => setSelectedTx(tx)}
+                className={`w-full p-3 text-left hover:bg-gray-50 transition-colors ${tx.isReversed ? 'bg-red-50' : ''}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                      tx.transactionType === 'C2B_STK_PUSH' ? 'bg-green-100' :
+                      tx.transactionType === 'B2C_PAYMENT' ? 'bg-blue-100' :
+                      tx.transactionType === 'REVERSAL' ? 'bg-orange-100' : 'bg-gray-100'
+                    }`}>
+                      {tx.transactionType === 'C2B_STK_PUSH' ? (
+                        <ArrowDownLeft className="h-4 w-4 text-green-600" />
+                      ) : tx.transactionType === 'B2C_PAYMENT' ? (
+                        <ArrowUpRight className="h-4 w-4 text-blue-600" />
+                      ) : tx.transactionType === 'REVERSAL' ? (
+                        <RotateCcw className="h-4 w-4 text-orange-600" />
+                      ) : (
+                        <Wallet className="h-4 w-4 text-gray-600" />
                       )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {getTypeLabel(tx.transactionType)}
+                        {tx.isReversed && <span className="text-red-500 text-xs ml-1">(Reversed)</span>}
+                      </p>
+                      <p className="text-xs text-gray-500">{tx.phoneNumber || '-'}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">
+                      {tx.transactionType !== 'BALANCE_QUERY'
+                        ? formatCurrency(tx.amount, 'KES')
+                        : '-'}
+                    </p>
+                    {getStatusBadge(tx.status)}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
 
-              {transactions.length === 0 && (
-                <p className="text-center text-gray-500 py-8">
-                  No transactions found
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between p-3 border-t border-gray-100">
+            <p className="text-sm text-gray-500">
+              Page {pagination.page} of {pagination.totalPages}
+            </p>
+            <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={pagination.page === 1}
                 onClick={() => fetchTransactions(pagination.page - 1)}
               >
-                Previous
+                Prev
               </Button>
-              <span className="py-2 px-4 text-sm text-gray-600">
-                Page {pagination.page} of {pagination.totalPages}
-              </span>
               <Button
                 variant="outline"
                 size="sm"
@@ -697,9 +584,77 @@ const AdminMpesaPage = () => {
                 Next
               </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Transaction Detail Modal */}
+      {selectedTx && (
+        <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
+          <div className="bg-white w-full md:max-w-lg md:rounded-xl rounded-t-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between">
+              <h2 className="font-bold text-lg">{getTypeLabel(selectedTx.transactionType)}</h2>
+              <button
+                onClick={() => setSelectedTx(null)}
+                className="p-2 hover:bg-gray-100 rounded-full"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div className="flex justify-center">
+                {getStatusBadge(selectedTx.status)}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500 text-xs mb-1">Amount</p>
+                  <p className="font-semibold">
+                    {selectedTx.transactionType !== 'BALANCE_QUERY'
+                      ? formatCurrency(selectedTx.amount, 'KES')
+                      : '-'}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500 text-xs mb-1">Date</p>
+                  <p className="font-medium text-sm">{formatDate(selectedTx.createdAt)}</p>
+                </div>
+                {selectedTx.phoneNumber && (
+                  <div className="bg-gray-50 rounded-lg p-3 col-span-2">
+                    <p className="text-gray-500 text-xs mb-1">Phone</p>
+                    <p className="font-mono">{selectedTx.phoneNumber}</p>
+                    {selectedTx.receiverPartyPublicName && (
+                      <p className="text-xs text-gray-500">{selectedTx.receiverPartyPublicName}</p>
+                    )}
+                  </div>
+                )}
+                {selectedTx.mpesaReceiptNumber && (
+                  <div className="bg-gray-50 rounded-lg p-3 col-span-2">
+                    <p className="text-gray-500 text-xs mb-1">Receipt</p>
+                    <p className="font-mono text-sm">{selectedTx.mpesaReceiptNumber}</p>
+                  </div>
+                )}
+              </div>
+
+              {canReverse(selectedTx) && (
+                <Button
+                  variant="outline"
+                  className="w-full text-red-600 border-red-300 hover:bg-red-50"
+                  onClick={() => {
+                    setSelectedTx(null);
+                    setReversalModalTx(selectedTx);
+                  }}
+                  isLoading={reversingTxId === selectedTx.id}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reverse Payment
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reversal Confirmation Modal */}
       <ConfirmModal
@@ -715,7 +670,7 @@ const AdminMpesaPage = () => {
           reversalModalTx && (
             <div className="text-left space-y-3">
               <p>Are you sure you want to reverse this B2C payment?</p>
-              <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+              <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Amount:</span>
                   <span className="font-semibold">KES {parseFloat(reversalModalTx.amount).toLocaleString()}</span>
@@ -724,16 +679,6 @@ const AdminMpesaPage = () => {
                   <span className="text-gray-500">Phone:</span>
                   <span className="font-mono">{reversalModalTx.phoneNumber}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Receipt:</span>
-                  <span className="font-mono text-xs">{reversalModalTx.mpesaReceiptNumber}</span>
-                </div>
-                {reversalModalTx.receiverPartyPublicName && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Recipient:</span>
-                    <span>{reversalModalTx.receiverPartyPublicName}</span>
-                  </div>
-                )}
               </div>
               <p className="text-red-600 text-xs font-medium">
                 This action cannot be undone.

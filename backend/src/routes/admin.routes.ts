@@ -172,6 +172,151 @@ router.get(
   })
 );
 
+// Suspend/Unsuspend User
+router.put(
+  '/users/:id/status',
+  requireRole('SUPER_ADMIN', 'ADMIN'),
+  validate([
+    body('isActive').isBoolean().withMessage('isActive must be a boolean'),
+    body('reason').optional().trim(),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { id } = req.params;
+    const { isActive, reason } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: { isActive },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        isActive: true,
+      },
+    });
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.adminId,
+        action: isActive ? 'USER_ACTIVATED' : 'USER_SUSPENDED',
+        entityType: 'User',
+        entityId: id,
+        details: { reason, previousStatus: user.isActive },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `User ${isActive ? 'activated' : 'suspended'} successfully`,
+      data: { user: updatedUser },
+    });
+  })
+);
+
+// Update User KYC Status
+router.put(
+  '/users/:id/kyc',
+  requireRole('SUPER_ADMIN', 'ADMIN'),
+  validate([
+    body('kycStatus').isIn(['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED']).withMessage('Invalid KYC status'),
+    body('notes').optional().trim(),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { id } = req.params;
+    const { kycStatus, notes } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: { kycStatus },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        kycStatus: true,
+      },
+    });
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.admin!.adminId,
+        action: 'USER_KYC_UPDATE',
+        entityType: 'User',
+        entityId: id,
+        details: { newStatus: kycStatus, previousStatus: user.kycStatus, notes },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `User KYC status updated to ${kycStatus}`,
+      data: { user: updatedUser },
+    });
+  })
+);
+
+// Get recent USDT deposits
+router.get(
+  '/deposits/usdt',
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [deposits, total] = await Promise.all([
+      prisma.balanceTransaction.findMany({
+        where: { type: 'USDT_DEPOSIT' },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: Number(limit),
+        include: {
+          userBalance: {
+            include: {
+              user: {
+                select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.balanceTransaction.count({ where: { type: 'USDT_DEPOSIT' } }),
+    ]);
+
+    res.json({
+      success: true,
+      data: deposits.map(d => ({
+        id: d.id,
+        userId: d.userBalance.user.id,
+        userEmail: d.userBalance.user.email,
+        userName: `${d.userBalance.user.firstName || ''} ${d.userBalance.user.lastName || ''}`.trim(),
+        amount: d.amount,
+        txHash: d.txHash,
+        status: d.status,
+        createdAt: d.createdAt,
+        completedAt: d.completedAt,
+      })),
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
+  })
+);
+
 // Rates
 router.get(
   '/rates',
