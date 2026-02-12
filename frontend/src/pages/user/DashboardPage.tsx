@@ -89,11 +89,6 @@ const DashboardPage = () => {
     return <ArrowUpRight className="h-4 w-4 text-red-600" />;
   };
 
-  // Helper to determine if a transaction is USDT-based
-  const isUsdtTransaction = (type: string) => {
-    return type === 'USDT_DEPOSIT' || type === 'USDT_WITHDRAWAL' || type === 'KES_WITHDRAWAL';
-  };
-
   return (
     <div className="space-y-4">
       {/* Header with greeting */}
