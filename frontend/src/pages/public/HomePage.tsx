@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../../components/layout/Header';
 import { PageTitle } from '../../components/ui/PageTitle';
+import { ratesApi } from '../../api/rates.api';
 import {
   ArrowRight,
   Shield,
@@ -19,6 +21,29 @@ const WHATSAPP_NUMBER = '+254768294351';
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`;
 
 const HomePage = () => {
+  const [sellRate, setSellRate] = useState<number | null>(null);
+  const [buyRate, setBuyRate] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        const response = await ratesApi.getAll();
+        if (response.success && response.data?.rates) {
+          const usdtKesRate = response.data.rates.find(
+            (r) => r.pair === 'USDT_KES' && r.isActive
+          );
+          if (usdtKesRate) {
+            setSellRate(Number(usdtKesRate.sellRate));
+            setBuyRate(Number(usdtKesRate.buyRate));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch rates:', err);
+      }
+    };
+    fetchRates();
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       <PageTitle title="" description="Convert USDT to KES instantly. Deposit crypto, withdraw to M-Pesa. Kenya's most trusted crypto-to-cash platform." />
@@ -59,7 +84,7 @@ const HomePage = () => {
                 to="/register"
                 className="inline-flex items-center justify-center px-8 py-4 text-base font-semibold rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-all shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30"
               >
-                Start Trading <ArrowRight className="ml-2 h-5 w-5" />
+                Get Started <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link
                 to="/rates"
@@ -72,12 +97,14 @@ const HomePage = () => {
             {/* Quick Stats */}
             <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto">
               <div className="text-center">
-                <p className="text-2xl md:text-3xl font-bold text-white">129.5</p>
+                <p className="text-2xl md:text-3xl font-bold text-white">
+                  {sellRate ? sellRate.toFixed(1) : '---'}
+                </p>
                 <p className="text-xs text-gray-400">USDT/KES Rate</p>
               </div>
               <div className="text-center border-x border-gray-700">
-                <p className="text-2xl md:text-3xl font-bold text-white">&lt;5 min</p>
-                <p className="text-xs text-gray-400">Withdrawal Time</p>
+                <p className="text-2xl md:text-3xl font-bold text-white">Instant</p>
+                <p className="text-xs text-gray-400">Withdrawals</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl md:text-3xl font-bold text-white">24/7</p>
@@ -164,7 +191,7 @@ const HomePage = () => {
               </div>
               <h3 className="font-semibold mb-1">Lightning Fast</h3>
               <p className="text-gray-600 text-sm">
-                Deposits credit instantly. Withdrawals hit your M-Pesa in under 5 minutes.
+                Deposits credit instantly. Withdrawals hit your M-Pesa in seconds.
               </p>
             </div>
 
@@ -233,7 +260,7 @@ const HomePage = () => {
                   <span className="text-primary-100 text-sm">USDT → KES</span>
                   <span className="bg-green-500/20 text-green-300 text-xs px-2 py-0.5 rounded-full">Sell</span>
                 </div>
-                <p className="text-3xl font-bold">129.50</p>
+                <p className="text-3xl font-bold">{sellRate ? sellRate.toFixed(2) : '---'}</p>
                 <p className="text-primary-200 text-sm mt-1">per USDT</p>
               </div>
 
@@ -242,7 +269,7 @@ const HomePage = () => {
                   <span className="text-primary-100 text-sm">KES → USDT</span>
                   <span className="bg-blue-500/20 text-blue-300 text-xs px-2 py-0.5 rounded-full">Buy</span>
                 </div>
-                <p className="text-3xl font-bold">131.00</p>
+                <p className="text-3xl font-bold">{buyRate ? buyRate.toFixed(2) : '---'}</p>
                 <p className="text-primary-200 text-sm mt-1">per USDT</p>
               </div>
             </div>
