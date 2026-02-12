@@ -303,7 +303,7 @@ const WalletPage = () => {
   return (
     <div className="space-y-4">
       {/* USDT Balance Card */}
-      <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
         </div>
@@ -319,9 +319,9 @@ const WalletPage = () => {
               className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
             >
               {showBalance ? (
-                <EyeOff className="h-5 w-5 text-blue-100" />
+                <EyeOff className="h-5 w-5 text-green-100" />
               ) : (
-                <Eye className="h-5 w-5 text-blue-100" />
+                <Eye className="h-5 w-5 text-green-100" />
               )}
             </button>
           </div>
@@ -334,7 +334,7 @@ const WalletPage = () => {
           </p>
 
           {showBalance && usdtRate > 0 && (
-            <p className="text-sm text-blue-100 mb-4">
+            <p className="text-sm text-green-100 mb-4">
               ≈ KES {kesEquivalent.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </p>
           )}
@@ -385,7 +385,7 @@ const WalletPage = () => {
               onClick={() => setActiveTab(tab.key as TabType)}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${
                 activeTab === tab.key
-                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
+                  ? 'text-green-600 border-b-2 border-green-600 bg-green-50/50'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >

@@ -28,7 +28,7 @@ export const BottomNav = () => {
               className={clsx(
                 'flex flex-col items-center justify-center flex-1 h-full transition-colors',
                 isActive
-                  ? 'text-blue-600'
+                  ? 'text-green-600'
                   : 'text-gray-400 hover:text-gray-600'
               )}
             >
@@ -47,7 +47,7 @@ export const BottomNav = () => {
           href={WHATSAPP_LINK}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex flex-col items-center justify-center flex-1 h-full transition-colors text-gray-400 hover:text-blue-600"
+          className="flex flex-col items-center justify-center flex-1 h-full transition-colors text-gray-400 hover:text-green-600"
         >
           <MessageCircle className="h-5 w-5" />
           <span className="text-xs mt-1 font-normal">Support</span>

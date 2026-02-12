@@ -312,6 +312,7 @@ model BalanceTransaction {
   status          BalanceTransactionStatus  @default(PENDING)
   currency        String                    @default("KES")  // KES or USDT
   amount          Decimal                   @db.Decimal(18, 6)
+  usdtAmount      Decimal?                  @db.Decimal(18, 6)  // Original USDT amount for USDT transactions
   balanceBefore   Decimal                   @db.Decimal(18, 6)
   balanceAfter    Decimal                   @db.Decimal(18, 6)
   reference       String?                   // M-Pesa receipt, tx hash, order number

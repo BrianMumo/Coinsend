@@ -684,7 +684,7 @@ class TronService {
       const exchangeRate = Number(rate.buyRate);
       const kesAmount = transferAmount * exchangeRate;
 
-      // 9. Credit user's balance (atomic transaction)
+      // 9. Credit user's USDT balance (atomic transaction)
       await prisma.$transaction(async (tx) => {
         // Get or create user balance
         let userBalance = await tx.userBalance.findUnique({
@@ -702,13 +702,13 @@ class TronService {
           });
         }
 
-        const currentKesBalance = Number(userBalance.balance);
-        const newKesBalance = currentKesBalance + kesAmount;
+        const currentUsdtBalance = Number(userBalance.usdtBalance);
+        const newUsdtBalance = currentUsdtBalance + transferAmount;
 
-        // Credit KES balance
+        // Credit USDT balance (not KES)
         await tx.userBalance.update({
           where: { userId },
-          data: { balance: newKesBalance },
+          data: { usdtBalance: newUsdtBalance },
         });
 
         // Create balance transaction record
@@ -717,14 +717,15 @@ class TronService {
             userBalanceId: userBalance.id,
             type: 'USDT_DEPOSIT',
             status: 'COMPLETED',
-            currency: 'KES',
-            amount: kesAmount,
-            balanceBefore: currentKesBalance,
-            balanceAfter: newKesBalance,
+            currency: 'USDT',
+            amount: transferAmount,
+            usdtAmount: transferAmount,
+            balanceBefore: currentUsdtBalance,
+            balanceAfter: newUsdtBalance,
             txHash,
             walletAddress: fromAddress,
             reference: txHash,
-            description: `USDT deposit: ${transferAmount} USDT → KES ${kesAmount.toFixed(2)} @ ${exchangeRate}`,
+            description: `USDT deposit: ${transferAmount} USDT (≈ KES ${kesAmount.toFixed(2)} @ ${exchangeRate})`,
             completedAt: new Date(),
           },
         });
@@ -753,7 +754,7 @@ class TronService {
         });
       });
 
-      logger.info(`Successfully credited ${kesAmount.toFixed(2)} KES to user ${userId} from ${transferAmount} USDT deposit (tx: ${txHash})`);
+      logger.info(`Successfully credited ${transferAmount} USDT to user ${userId} (tx: ${txHash})`);
 
       return {
         success: true,

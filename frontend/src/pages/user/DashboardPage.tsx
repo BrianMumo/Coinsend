@@ -98,8 +98,8 @@ const DashboardPage = () => {
     <div className="space-y-4">
       {/* Header with greeting */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-          <span className="text-blue-600 font-semibold text-sm">
+        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+          <span className="text-green-600 font-semibold text-sm">
             {user?.firstName?.[0] || user?.email?.[0] || 'U'}
           </span>
         </div>
@@ -112,7 +112,7 @@ const DashboardPage = () => {
       </div>
 
       {/* USDT Balance Card */}
-      <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white relative overflow-hidden">
         {/* Decorative pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -right-8 -top-8 w-32 h-32 border-[20px] border-white rounded-full"></div>
@@ -136,15 +136,15 @@ const DashboardPage = () => {
               className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
             >
               {showBalance ? (
-                <EyeOff className="h-5 w-5 text-blue-100" />
+                <EyeOff className="h-5 w-5 text-green-100" />
               ) : (
-                <Eye className="h-5 w-5 text-blue-100" />
+                <Eye className="h-5 w-5 text-green-100" />
               )}
             </button>
           </div>
 
           {/* KES Equivalent */}
-          <p className="text-sm text-blue-100 mb-4">
+          <p className="text-sm text-green-100 mb-4">
             {showBalance
               ? `≈ KES ${(parseFloat(usdtBalance) * usdtRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
               : '≈ KES ••••••'
@@ -172,8 +172,8 @@ const DashboardPage = () => {
       </div>
 
       {/* How it works */}
-      <div className="bg-blue-50 rounded-xl p-3">
-        <p className="text-sm text-blue-800">
+      <div className="bg-green-50 rounded-xl p-3">
+        <p className="text-sm text-green-800">
           <strong>How it works:</strong> Deposit USDT to your balance. Withdraw to M-Pesa at the current rate anytime.
         </p>
       </div>
@@ -184,7 +184,7 @@ const DashboardPage = () => {
           <h3 className="font-semibold text-gray-900">Recent Transactions</h3>
           <Link
             to="/wallet"
-            className="text-sm text-blue-600 hover:text-blue-700 flex items-center font-medium"
+            className="text-sm text-green-600 hover:text-green-700 flex items-center font-medium"
           >
             See all <ChevronRight className="h-4 w-4" />
           </Link>
@@ -204,7 +204,7 @@ const DashboardPage = () => {
             <p className="text-gray-500 text-sm mb-1">No transactions yet</p>
             <button
               onClick={() => navigate('/wallet', { state: { action: 'deposit' } })}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-green-600 hover:text-green-700 font-medium"
             >
               Make your first USDT deposit →
             </button>
