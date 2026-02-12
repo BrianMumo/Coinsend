@@ -630,6 +630,18 @@ router.post(
   })
 );
 
+router.delete(
+  '/rates/:id',
+  requireRole('SUPER_ADMIN'),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const result = await rateService.deleteRate(req.params.id);
+    res.json({
+      success: true,
+      message: `Rate ${result.deletedPair} deleted successfully`,
+    });
+  })
+);
+
 // Liquidity
 router.get(
   '/liquidity',

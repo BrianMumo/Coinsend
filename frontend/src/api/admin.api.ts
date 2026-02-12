@@ -234,6 +234,11 @@ export const adminRatesApi = {
     const response = await adminApi.post('/admin/rates', data);
     return response.data;
   },
+
+  delete: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await adminApi.delete(`/admin/rates/${id}`);
+    return response.data;
+  },
 };
 
 export const adminLiquidityApi = {

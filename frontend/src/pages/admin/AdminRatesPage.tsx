@@ -8,7 +8,7 @@ import { PageTitle } from '../../components/ui/PageTitle';
 import { adminRatesApi } from '../../api/admin.api';
 import { ExchangeRate } from '../../types';
 import { formatDate } from '../../utils/formatters';
-import { Edit2, Save, X, Plus } from 'lucide-react';
+import { Edit2, Save, X, Plus, Trash2 } from 'lucide-react';
 
 const AdminRatesPage = () => {
   const [rates, setRates] = useState<ExchangeRate[]>([]);
@@ -107,6 +107,25 @@ const AdminRatesPage = () => {
       setError(err.response?.data?.error?.message || 'Failed to add rate');
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const handleDelete = async (id: string, pair: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${pair}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await adminRatesApi.delete(id);
+      if (response.success) {
+        setRates(rates.filter((r) => r.id !== id));
+        setSuccess(`Rate ${pair} deleted successfully`);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Failed to delete rate');
     }
   };
 
@@ -273,13 +292,23 @@ const AdminRatesPage = () => {
                           </Button>
                         </div>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleEdit(rate)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(rate)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(rate.id, rate.pair)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       )}
                     </td>
                   </tr>

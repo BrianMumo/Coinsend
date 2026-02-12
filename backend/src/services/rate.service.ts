@@ -165,6 +165,22 @@ export class RateService {
 
     return rate;
   }
+
+  async deleteRate(rateId: string) {
+    const rate = await prisma.exchangeRate.findUnique({
+      where: { id: rateId },
+    });
+
+    if (!rate) {
+      throw new AppError('Rate not found', 404);
+    }
+
+    await prisma.exchangeRate.delete({
+      where: { id: rateId },
+    });
+
+    return { success: true, deletedPair: rate.pair };
+  }
 }
 
 export const rateService = new RateService();
