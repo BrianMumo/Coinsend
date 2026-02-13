@@ -75,7 +75,7 @@ const AdminLoginPage = () => {
             <Input
               label="Email"
               type="email"
-              placeholder="admin@coinsend.com"
+              placeholder="Enter your email"
               error={errors.email?.message}
               {...register('email')}
             />
@@ -92,10 +92,6 @@ const AdminLoginPage = () => {
               Sign In
             </Button>
           </form>
-
-          <p className="mt-4 text-center text-sm text-gray-500">
-            Default: admin@coinsend.com / admin123
-          </p>
         </CardContent>
       </Card>
     </div>
