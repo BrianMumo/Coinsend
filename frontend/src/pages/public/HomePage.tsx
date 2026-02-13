@@ -101,20 +101,20 @@ const HomePage = () => {
             </div>
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 max-w-lg mx-auto">
               <div className="text-center">
-                <p className="text-2xl md:text-3xl font-bold text-white">
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">
                   {buyRate.toFixed(0)}
                 </p>
-                <p className="text-xs text-gray-400">KES per USDT</p>
+                <p className="text-[10px] sm:text-xs text-gray-400">KES per USDT</p>
               </div>
               <div className="text-center border-x border-gray-700">
-                <p className="text-2xl md:text-3xl font-bold text-white">Instant</p>
-                <p className="text-xs text-gray-400">Conversion</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">Instant</p>
+                <p className="text-[10px] sm:text-xs text-gray-400">Conversion</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl md:text-3xl font-bold text-white">24/7</p>
-                <p className="text-xs text-gray-400">Available</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">24/7</p>
+                <p className="text-[10px] sm:text-xs text-gray-400">Available</p>
               </div>
             </div>
           </div>
@@ -415,7 +415,7 @@ const HomePage = () => {
                   <span className="text-primary-100 text-sm">You Send</span>
                   <span className="bg-green-500/20 text-green-300 text-xs px-2 py-0.5 rounded-full">USDT → KES</span>
                 </div>
-                <p className="text-3xl font-bold">{buyRate.toFixed(2)} KES</p>
+                <p className="text-2xl sm:text-3xl font-bold">{buyRate.toFixed(2)} KES</p>
                 <p className="text-primary-200 text-sm mt-1">per 1 USDT</p>
               </div>
 
@@ -424,7 +424,7 @@ const HomePage = () => {
                   <span className="text-primary-100 text-sm">You Send</span>
                   <span className="bg-blue-500/20 text-blue-300 text-xs px-2 py-0.5 rounded-full">KES → USDT</span>
                 </div>
-                <p className="text-3xl font-bold">{sellRate.toFixed(2)} KES</p>
+                <p className="text-2xl sm:text-3xl font-bold">{sellRate.toFixed(2)} KES</p>
                 <p className="text-primary-200 text-sm mt-1">per 1 USDT</p>
               </div>
             </div>
@@ -485,7 +485,7 @@ const HomePage = () => {
       {/* Footer */}
       <footer className="py-10 px-4 bg-gray-900 text-gray-400">
         <div className="max-w-5xl mx-auto">
-          <div className="grid sm:grid-cols-3 gap-8 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-8">
             <div>
               <h3 className="text-white text-lg font-bold mb-1">Coinsend</h3>
               <p className="text-sm text-gray-500">

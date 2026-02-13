@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { Badge, getStatusVariant } from '../../components/ui/Badge';
-import { Spinner } from '../../components/ui/Spinner';
+import { DashboardSkeleton } from '../../components/ui/Skeleton';
 import { balanceApi } from '../../api/balance.api';
 import { ratesApi } from '../../api/rates.api';
 import { BalanceTransaction } from '../../types';
@@ -89,6 +89,10 @@ const DashboardPage = () => {
     return <ArrowUpRight className="h-4 w-4 text-red-600" />;
   };
 
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
     <div className="space-y-4">
       {/* Header with greeting */}
@@ -119,8 +123,8 @@ const DashboardPage = () => {
             <span className="text-sm font-medium">KES Balance</span>
           </div>
 
-          <div className="flex items-center gap-3 mb-1">
-            <p className="text-3xl font-bold">
+          <div className="flex items-center gap-2 sm:gap-3 mb-1">
+            <p className="text-2xl sm:text-3xl font-bold truncate">
               {showBalance
                 ? `KES ${(parseFloat(usdtBalance) * usdtRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                 : 'KES ••••••'
@@ -185,11 +189,7 @@ const DashboardPage = () => {
           </Link>
         </div>
 
-        {isLoading ? (
-          <div className="flex justify-center py-10">
-            <Spinner size="md" />
-          </div>
-        ) : recentTransactions.length === 0 ? (
+        {recentTransactions.length === 0 ? (
           <div className="text-center py-10">
             <div className="w-14 h-14 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
               <svg className="w-7 h-7 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

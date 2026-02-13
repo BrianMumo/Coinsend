@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { PageLoader } from './components/ui/Spinner';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { UserLayout } from './components/layout/UserLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { ToastContainer } from './components/ui/Toast';
@@ -35,35 +36,37 @@ function App() {
   return (
     <>
       <ToastContainer />
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/rates" element={<RatesPage />} />
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/rates" element={<RatesPage />} />
 
-        {/* User routes */}
-        <Route path="/dashboard" element={<UserLayout><DashboardPage /></UserLayout>} />
-        <Route path="/wallet" element={<UserLayout><WalletPage /></UserLayout>} />
-        <Route path="/profile" element={<UserLayout><ProfilePage /></UserLayout>} />
+          {/* User routes */}
+          <Route path="/dashboard" element={<UserLayout><DashboardPage /></UserLayout>} />
+          <Route path="/wallet" element={<UserLayout><WalletPage /></UserLayout>} />
+          <Route path="/profile" element={<UserLayout><ProfilePage /></UserLayout>} />
 
-        {/* Admin routes */}
-        <Route path="/mumo/login" element={<AdminLoginPage />} />
-        <Route path="/mumo" element={<AdminLayout><AdminDashboardPage /></AdminLayout>} />
-        <Route path="/mumo/transactions" element={<AdminLayout><AdminTransactionsPage /></AdminLayout>} />
-        <Route path="/mumo/orders" element={<AdminLayout><AdminOrdersPage /></AdminLayout>} />
-        <Route path="/mumo/users" element={<AdminLayout><AdminUsersPage /></AdminLayout>} />
-        <Route path="/mumo/mpesa" element={<AdminLayout><AdminMpesaPage /></AdminLayout>} />
-        <Route path="/mumo/tron" element={<AdminLayout><AdminTronPage /></AdminLayout>} />
-        <Route path="/mumo/rates" element={<AdminLayout><AdminRatesPage /></AdminLayout>} />
-        <Route path="/mumo/liquidity" element={<AdminLayout><AdminLiquidityPage /></AdminLayout>} />
-        <Route path="/mumo/wallets" element={<AdminLayout><AdminWalletsPage /></AdminLayout>} />
+          {/* Admin routes */}
+          <Route path="/mumo/login" element={<AdminLoginPage />} />
+          <Route path="/mumo" element={<AdminLayout><AdminDashboardPage /></AdminLayout>} />
+          <Route path="/mumo/transactions" element={<AdminLayout><AdminTransactionsPage /></AdminLayout>} />
+          <Route path="/mumo/orders" element={<AdminLayout><AdminOrdersPage /></AdminLayout>} />
+          <Route path="/mumo/users" element={<AdminLayout><AdminUsersPage /></AdminLayout>} />
+          <Route path="/mumo/mpesa" element={<AdminLayout><AdminMpesaPage /></AdminLayout>} />
+          <Route path="/mumo/tron" element={<AdminLayout><AdminTronPage /></AdminLayout>} />
+          <Route path="/mumo/rates" element={<AdminLayout><AdminRatesPage /></AdminLayout>} />
+          <Route path="/mumo/liquidity" element={<AdminLayout><AdminLiquidityPage /></AdminLayout>} />
+          <Route path="/mumo/wallets" element={<AdminLayout><AdminWalletsPage /></AdminLayout>} />
 
-        {/* 404 Not Found */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-      </Suspense>
+          {/* 404 Not Found */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </>
   );
 }

@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
-import { Spinner } from '../../components/ui/Spinner';
+import { WalletSkeleton } from '../../components/ui/Skeleton';
 import { Alert } from '../../components/ui/Alert';
 import { balanceApi } from '../../api/balance.api';
 import { ratesApi } from '../../api/rates.api';
@@ -283,11 +283,7 @@ const WalletPage = () => {
   }) || [];
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[300px]">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <WalletSkeleton />;
   }
 
   if (error) {
@@ -330,7 +326,7 @@ const WalletPage = () => {
             </button>
           </div>
 
-          <p className="text-3xl font-bold mb-1">
+          <p className="text-2xl sm:text-3xl font-bold mb-1 truncate">
             {showBalance
               ? `KES ${kesEquivalent.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
               : 'KES ••••••'
