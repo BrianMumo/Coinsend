@@ -67,6 +67,30 @@ export class AdminService {
     return admin;
   }
 
+  async updateCredentials(adminId: string, data: { email?: string; password?: string; currentPassword: string }) {
+    const admin = await prisma.admin.findUnique({ where: { id: adminId } });
+    if (!admin) {
+      throw new AppError('Admin not found', 404);
+    }
+
+    const isValid = await bcrypt.compare(data.currentPassword, admin.passwordHash);
+    if (!isValid) {
+      throw new AppError('Current password is incorrect', 401);
+    }
+
+    const updateData: any = {};
+    if (data.email) updateData.email = data.email;
+    if (data.password) updateData.passwordHash = await bcrypt.hash(data.password, 12);
+
+    const updated = await prisma.admin.update({
+      where: { id: adminId },
+      data: updateData,
+      select: { id: true, email: true, firstName: true, lastName: true, role: true },
+    });
+
+    return updated;
+  }
+
   // Dashboard
   async getDashboardStats() {
     const [

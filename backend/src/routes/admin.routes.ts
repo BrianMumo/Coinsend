@@ -84,6 +84,24 @@ router.get(
   })
 );
 
+// Update admin credentials
+router.put(
+  '/me/credentials',
+  validate([
+    body('currentPassword').notEmpty().withMessage('Current password is required'),
+    body('email').optional().isEmail().withMessage('Valid email is required'),
+    body('password').optional().isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+  ]),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const result = await adminService.updateCredentials(req.admin!.adminId, req.body);
+    res.json({
+      success: true,
+      data: result,
+      message: 'Credentials updated successfully',
+    });
+  })
+);
+
 // Dashboard
 router.get(
   '/dashboard',
