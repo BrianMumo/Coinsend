@@ -18,9 +18,11 @@ export const Header = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center">
-            <span className={`text-2xl font-bold ${isHomePage ? 'text-white' : 'text-primary-600'}`}>
-              Coinsend
-            </span>
+            <img
+              src={isHomePage ? '/logo-white.svg' : '/logo.svg'}
+              alt="Coinsend"
+              className="h-8"
+            />
           </Link>
 
           {/* Desktop Navigation */}
