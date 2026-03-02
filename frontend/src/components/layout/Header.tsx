@@ -21,7 +21,7 @@ export const Header = () => {
             <img
               src={isHomePage ? '/logo-white.svg' : '/logo.svg'}
               alt="Coinsend"
-              className="h-8"
+              className="h-9 sm:h-10"
             />
           </Link>
 
