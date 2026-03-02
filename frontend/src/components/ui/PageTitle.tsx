@@ -10,7 +10,7 @@ export const PageTitle = ({ title, description, path }: PageTitleProps) => {
   const fullTitle = title ? `${title} | Coinsend` : 'Coinsend - Convert Crypto to Kenya Shillings Instantly';
   const defaultDescription = 'Convert USDT to Kenya Shillings instantly. No bank account needed. Get M-Pesa mobile money in seconds. Perfect for tourists, travelers & freelancers.';
   const desc = description || defaultDescription;
-  const url = path ? `https://coinsend.vercel.app${path}` : 'https://coinsend.vercel.app';
+  const url = path ? `https://coinsend.io${path}` : 'https://coinsend.io';
 
   return (
     <Helmet>
