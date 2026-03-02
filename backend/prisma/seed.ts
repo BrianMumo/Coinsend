@@ -6,15 +6,17 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding database...');
 
-  // Create default admin
-  const adminPassword = await bcrypt.hash('Bri@nmum0', 12);
+  // Create default admin (credentials from environment variables)
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@coinsend.com';
+  const adminPass = process.env.ADMIN_PASSWORD || 'changeme-on-first-login';
+  const adminPassword = await bcrypt.hash(adminPass, 12);
   const admin = await prisma.admin.upsert({
-    where: { email: 'coinsend@proton.me' },
+    where: { email: adminEmail },
     update: {
       passwordHash: adminPassword,
     },
     create: {
-      email: 'coinsend@proton.me',
+      email: adminEmail,
       passwordHash: adminPassword,
       firstName: 'Super',
       lastName: 'Admin',
