@@ -388,7 +388,7 @@ const AdminMpesaPage = () => {
             <Input
               type="number"
               min="10"
-              max="150000"
+              max="250000"
               placeholder="Amount (KES)"
               value={b2cForm.amount}
               onChange={(e) => setB2cForm({ ...b2cForm, amount: e.target.value })}

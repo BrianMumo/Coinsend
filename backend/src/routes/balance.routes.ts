@@ -15,8 +15,8 @@ router.use(authenticate);
 // Validation rules
 const depositValidation = [
   body('amount')
-    .isFloat({ min: 10, max: 150000 })
-    .withMessage('Amount must be between KES 10 and KES 150,000'),
+    .isFloat({ min: 10, max: 250000 })
+    .withMessage('Amount must be between KES 10 and KES 250,000'),
   body('phoneNumber')
     .notEmpty()
     .withMessage('Phone number is required')

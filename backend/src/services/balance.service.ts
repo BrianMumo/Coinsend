@@ -194,8 +194,8 @@ class BalanceService {
     if (amount < 10) {
       throw new AppError('Minimum deposit is KES 10', 400);
     }
-    if (amount > 150000) {
-      throw new AppError('Maximum deposit is KES 150,000', 400);
+    if (amount > 250000) {
+      throw new AppError('Maximum deposit is KES 250,000', 400);
     }
 
     const balance = await this.getOrCreateBalance(userId);

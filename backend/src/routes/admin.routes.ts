@@ -736,7 +736,7 @@ router.put(
 
 const b2cPaymentValidation = [
   body('phoneNumber').notEmpty().withMessage('Phone number is required'),
-  body('amount').isFloat({ min: 10, max: 150000 }).withMessage('Amount must be between 10 and 150,000 KES'),
+  body('amount').isFloat({ min: 10, max: 250000 }).withMessage('Amount must be between 10 and 250,000 KES'),
   body('commandId')
     .optional()
     .isIn(['BusinessPayment', 'SalaryPayment', 'PromotionPayment'])
