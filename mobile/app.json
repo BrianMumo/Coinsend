@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -24,10 +24,22 @@
       "package": "io.coinsend.app"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
+      ]
     ],
     "extra": {
-      "apiUrl": "https://coinsend-production.up.railway.app/api"
-    }
+      "apiUrl": "https://coinsend-production.up.railway.app/api",
+      "eas": {
+        "projectId": "4a83c0d2-8173-49cd-9e37-b5d4e3918d9b"
+      }
+    },
+    "owner": "coinsend"
   }
 }
