@@ -1162,9 +1162,10 @@ class TronService {
    */
   async getWalletSummary() {
     try {
+      // Use individual try-catches so one failing on-chain call doesn't kill the whole summary
       const [trxBalance, usdtBalance] = await Promise.all([
-        this.getTrxBalance(),
-        this.getUsdtBalance(),
+        this.getTrxBalance().catch(() => 0),
+        this.getUsdtBalance().catch(() => 0),
       ]);
 
       const todayStart = new Date();

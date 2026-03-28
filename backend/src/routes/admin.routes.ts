@@ -1059,18 +1059,28 @@ router.get(
   asyncHandler(async (req: AdminRequest, res: Response) => {
     const { page, limit, type, status } = req.query;
 
-    const result = await tronService.getRecentTransactions({
-      page: page ? parseInt(page as string) : 1,
-      limit: limit ? parseInt(limit as string) : 20,
-      type: type as 'DEPOSIT' | 'WITHDRAWAL' | undefined,
-      status: status as 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'FAILED' | undefined,
-    });
+    try {
+      const result = await tronService.getRecentTransactions({
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 20,
+        type: type as 'DEPOSIT' | 'WITHDRAWAL' | undefined,
+        status: status as 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'FAILED' | undefined,
+      });
 
-    res.json({
-      success: true,
-      data: result.data,
-      pagination: result.pagination,
-    });
+      res.json({
+        success: true,
+        data: result.data,
+        pagination: result.pagination,
+      });
+    } catch (err: any) {
+      // Return empty results rather than a 500 so the admin page still renders
+      res.json({
+        success: true,
+        data: [],
+        pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+        warning: err.message,
+      });
+    }
   })
 );
 

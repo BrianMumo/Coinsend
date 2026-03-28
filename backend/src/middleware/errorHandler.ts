@@ -26,6 +26,9 @@ export const errorHandler = (
   if (err instanceof AppError) {
     statusCode = err.statusCode;
     message = err.message;
+  } else {
+    // Surface actual error message to help diagnose production issues
+    message = err.message || 'Internal server error';
   }
 
   logger.error(`${statusCode} - ${err.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
