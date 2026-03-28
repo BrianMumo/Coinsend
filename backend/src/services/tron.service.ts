@@ -1274,29 +1274,21 @@ class TronService {
     amountSun: number,
     privateKey: string
   ): Promise<string> {
+    const tronWeb = this.getTronWeb();
     const baseUrl = config.tron.network === 'mainnet'
       ? 'https://api.trongrid.io'
       : 'https://api.shasta.trongrid.io';
-    const headers = { 'TRON-PRO-API-KEY': config.tron.apiKey };
-    const tronWeb = this.getTronWeb();
 
-    const fromHex = tronWeb.address.toHex(fromAddress);
-    const toHex = tronWeb.address.toHex(toAddress);
+    // Use TronWeb's transactionBuilder — handles address format, no private key needed
+    const unsignedTx = await tronWeb.transactionBuilder.sendTrx(toAddress, amountSun, fromAddress);
 
-    const { data: buildData } = await axios.post(
-      `${baseUrl}/wallet/createtransaction`,
-      { owner_address: fromHex, to_address: toHex, amount: amountSun },
-      { headers, timeout: 15000 }
-    );
-    if (!buildData?.txID) throw new Error(`Failed to build TRX tx: ${JSON.stringify(buildData)}`);
-
-    // sign() on an object bypasses TronWeb's key-format validation
-    const signedTx = await tronWeb.trx.sign(buildData, privateKey);
+    // sign() on a transaction object skips key-format validation in TronWeb
+    const signedTx = await tronWeb.trx.sign(unsignedTx, privateKey);
 
     const { data: broadcastData } = await axios.post(
       `${baseUrl}/wallet/broadcasttransaction`,
       signedTx,
-      { headers, timeout: 15000 }
+      { headers: { 'TRON-PRO-API-KEY': config.tron.apiKey }, timeout: 15000 }
     );
     if (!broadcastData?.result) throw new Error(`TRX broadcast failed: ${JSON.stringify(broadcastData)}`);
 
@@ -1304,8 +1296,8 @@ class TronService {
   }
 
   /**
-   * Build, sign, and broadcast a TRC-20 USDT transfer via TronGrid REST API.
-   * Uses the same validation-bypass pattern as sendTrxDirect.
+   * Build, sign, and broadcast a TRC-20 USDT transfer.
+   * Uses TronWeb's transactionBuilder for correct ABI encoding + trx.sign() to bypass key validation.
    */
   private async sendUsdtDirect(
     fromAddress: string,
@@ -1313,40 +1305,29 @@ class TronService {
     amountSun: number,
     privateKey: string
   ): Promise<string> {
+    const tronWeb = this.getTronWeb();
     const baseUrl = config.tron.network === 'mainnet'
       ? 'https://api.trongrid.io'
       : 'https://api.shasta.trongrid.io';
-    const headers = { 'TRON-PRO-API-KEY': config.tron.apiKey };
-    const tronWeb = this.getTronWeb();
 
-    const fromHex = tronWeb.address.toHex(fromAddress);
-    const contractHex = tronWeb.address.toHex(this.usdtContract);
-
-    // ABI-encode transfer(address,uint256) parameters (no function selector)
-    const toHexRaw = tronWeb.address.toHex(toAddress).replace(/^41/, ''); // remove TRON version byte
-    const paddedTo = toHexRaw.padStart(64, '0');                           // 32-byte address
-    const paddedAmount = BigInt(amountSun).toString(16).padStart(64, '0'); // 32-byte uint256
-    const parameter = paddedTo + paddedAmount;
-
-    const { data: triggerData } = await axios.post(
-      `${baseUrl}/wallet/triggersmartcontract`,
-      {
-        owner_address: fromHex,
-        contract_address: contractHex,
-        function_selector: 'transfer(address,uint256)',
-        parameter,
-        fee_limit: 50_000_000,
-        call_value: 0,
-      },
-      { headers, timeout: 15000 }
+    // Use TronWeb's transactionBuilder.triggerSmartContract — handles ABI encoding correctly
+    const { transaction: unsignedTx } = await tronWeb.transactionBuilder.triggerSmartContract(
+      this.usdtContract,
+      'transfer(address,uint256)',
+      { feeLimit: 50_000_000, callValue: 0 },
+      [
+        { type: 'address', value: toAddress },
+        { type: 'uint256', value: amountSun },
+      ],
+      fromAddress
     );
 
-    if (!triggerData?.transaction?.txID) {
-      throw new Error(`Failed to build USDT tx: ${JSON.stringify(triggerData)}`);
+    if (!unsignedTx?.txID) {
+      throw new Error(`transactionBuilder failed to build USDT tx`);
     }
 
-    // sign() on an object bypasses TronWeb's key-format validation
-    const signedTx = await tronWeb.trx.sign(triggerData.transaction, privateKey);
+    // sign() on a transaction object skips key-format validation in TronWeb
+    const signedTx = await tronWeb.trx.sign(unsignedTx, privateKey);
 
     const { data: broadcastData } = await axios.post(
       `${baseUrl}/wallet/broadcasttransaction`,
