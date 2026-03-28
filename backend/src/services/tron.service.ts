@@ -39,19 +39,22 @@ class TronService {
         ? 'https://api.trongrid.io'
         : 'https://api.shasta.trongrid.io';
 
-      // Only pass privateKey if it looks valid (64 hex chars)
       const pk = config.tron.privateKey;
-      const validKey = pk && /^[0-9a-fA-F]{64}$/.test(pk) ? pk : undefined;
 
-      if (pk && !validKey) {
-        logger.warn('TRON_PRIVATE_KEY appears invalid (must be 64 hex characters) — running in read-only mode');
+      // Try initializing with private key; fall back to read-only if it fails
+      try {
+        this.tronWeb = new TronWeb({
+          fullHost,
+          headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+          privateKey: pk || undefined,
+        });
+      } catch {
+        logger.warn('TronWeb init with private key failed — initializing in read-only mode');
+        this.tronWeb = new TronWeb({
+          fullHost,
+          headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+        });
       }
-
-      this.tronWeb = new TronWeb({
-        fullHost,
-        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-        privateKey: validKey,
-      });
     }
 
     return this.tronWeb;
