@@ -28,6 +28,8 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "tronweb": "^6.2.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
     "winston": "^3.11.0"
   },
   "devDependencies": {
@@ -38,9 +40,7 @@
     "@types/multer": "^1.4.11",
     "@types/node": "^20.10.0",
     "nodemon": "^3.0.2",
-    "prisma": "^5.8.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "prisma": "^5.8.0"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
