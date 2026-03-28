@@ -444,6 +444,26 @@ class TronService {
       logger.error('Failed to enumerate user deposit addresses:', error.message);
     }
 
+    // ── 3. Retry any pending sweeps (queued from current or previous cycles) ──
+    try {
+      const pendingSweeps = await prisma.systemConfig.findMany({
+        where: { key: { startsWith: 'pendingSweep_' } },
+      });
+
+      for (const entry of pendingSweeps) {
+        const userId = entry.key.replace('pendingSweep_', '');
+        const result = await this.sweepUserDeposit(userId);
+        if (result.success) {
+          logger.info(`Swept ${result.sweptAmount} USDT from user ${userId} to hot wallet (tx: ${result.txHash})`);
+          await prisma.systemConfig.delete({ where: { key: entry.key } });
+        } else {
+          logger.warn(`Sweep pending for user ${userId}: ${result.error} — will retry next cycle`);
+        }
+      }
+    } catch (error: any) {
+      logger.error('Failed to process pending sweeps:', error.message);
+    }
+
     if (totalDeposits > 0) {
       logger.info(`Processed ${totalDeposits} new USDT deposits total`);
     }
@@ -506,16 +526,11 @@ class TronService {
         await this.creditUserDeposit(userId, txHash, fromAddress, amount);
         newDeposits++;
 
-        // Auto-sweep: move USDT from user's personal address to hot wallet
-        // Fire-and-forget — deposit credit is already done even if sweep fails
-        this.sweepUserDeposit(userId).then((result) => {
-          if (result.success) {
-            logger.info(`Auto-swept ${result.sweptAmount} USDT from user ${userId} to hot wallet (sweep tx: ${result.txHash})`);
-          } else {
-            logger.warn(`Auto-sweep failed for user ${userId}: ${result.error} — funds remain in deposit address`);
-          }
-        }).catch((err) => {
-          logger.error(`Auto-sweep error for user ${userId}: ${err.message}`);
+        // Queue a sweep — will be retried each poll cycle until it succeeds
+        await prisma.systemConfig.upsert({
+          where: { key: `pendingSweep_${userId}` },
+          update: { value: 'true' },
+          create: { key: `pendingSweep_${userId}`, value: 'true' },
         });
       }
     }
