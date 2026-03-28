@@ -1186,13 +1186,31 @@ class TronService {
 
     const tronWeb = this.getTronWeb();
 
-    // Check TRX balance for bandwidth; top up if needed
-    const trxBalance = (await tronWeb.trx.getBalance(user.depositAddress)) / 1_000_000;
-    if (trxBalance < 1) {
-      logger.info(`Sending TRX to user deposit address ${user.depositAddress} for bandwidth`);
+    // Check free bandwidth first — each address gets 600 free bandwidth/day.
+    // A TRC-20 USDT transfer costs ~350 bandwidth, so we only send TRX when
+    // both free bandwidth AND TRX balance are insufficient.
+    let needsTrx = false;
+    try {
+      const accountResources = await tronWeb.trx.getAccountResources(user.depositAddress);
+      const freeBandwidth = (accountResources.freeNetLimit || 600) - (accountResources.freeNetUsed || 0);
+      const stakedBandwidth = (accountResources.NetLimit || 0) - (accountResources.NetUsed || 0);
+      const availableBandwidth = freeBandwidth + stakedBandwidth;
+      if (availableBandwidth < 350) {
+        const trxBalance = (await tronWeb.trx.getBalance(user.depositAddress)) / 1_000_000;
+        needsTrx = trxBalance < 1;
+      }
+      logger.info(`Deposit address ${user.depositAddress}: bandwidth=${availableBandwidth}, needsTrx=${needsTrx}`);
+    } catch {
+      // If we can't check, fall back to sending TRX to be safe
+      const trxBalance = (await tronWeb.trx.getBalance(user.depositAddress)) / 1_000_000;
+      needsTrx = trxBalance < 1;
+    }
+
+    if (needsTrx) {
+      logger.info(`Sending 2 TRX to deposit address ${user.depositAddress} for bandwidth`);
       try {
-        await tronWeb.trx.sendTransaction(user.depositAddress, 5_000_000); // 5 TRX
-        await new Promise(resolve => setTimeout(resolve, 4000)); // wait ~4s
+        await tronWeb.trx.sendTransaction(user.depositAddress, 2_000_000); // 2 TRX (enough for ~6 transfers)
+        await new Promise(resolve => setTimeout(resolve, 4000));
       } catch (err: any) {
         logger.warn(`Could not send TRX for bandwidth: ${err.message}`);
       }
