@@ -489,6 +489,18 @@ class TronService {
 
         await this.creditUserDeposit(userId, txHash, fromAddress, amount);
         newDeposits++;
+
+        // Auto-sweep: move USDT from user's personal address to hot wallet
+        // Fire-and-forget — deposit credit is already done even if sweep fails
+        this.sweepUserDeposit(userId).then((result) => {
+          if (result.success) {
+            logger.info(`Auto-swept ${result.sweptAmount} USDT from user ${userId} to hot wallet (sweep tx: ${result.txHash})`);
+          } else {
+            logger.warn(`Auto-sweep failed for user ${userId}: ${result.error} — funds remain in deposit address`);
+          }
+        }).catch((err) => {
+          logger.error(`Auto-sweep error for user ${userId}: ${err.message}`);
+        });
       }
     }
 
