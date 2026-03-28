@@ -270,23 +270,18 @@ class TronService {
         return { success: false, error: `Insufficient USDT balance. Have: ${balance}, Need: ${amount}` };
       }
 
-      // Use signing TronWeb for the actual transfer
-      const tronWeb = this.getSigningTronWeb();
-
-      // Get contract instance
-      const contract = await tronWeb.contract().at(this.usdtContract);
-
       // Amount in smallest unit (6 decimals for USDT)
       const amountInSun = Math.floor(amount * 1_000_000);
 
       logger.info(`Sending ${amount} USDT to ${toAddress}`);
 
-      // Send transaction
-      const tx = await contract.transfer(toAddress, amountInSun).send({
-        feeLimit: 50_000_000, // 50 TRX max fee
-      });
-
-      const txHash = typeof tx === 'string' ? tx : tx.txid || tx.transaction?.txID;
+      // Use direct API signing — bypasses TronWeb constructor key validation entirely
+      const txHash = await this.sendUsdtDirect(
+        this.getHotWalletAddress(),
+        toAddress,
+        amountInSun,
+        config.tron.privateKey
+      );
 
       logger.info(`USDT sent successfully. TX Hash: ${txHash}`);
 
@@ -1269,10 +1264,104 @@ class TronService {
   }
 
   /**
+   * Build, sign, and broadcast a TRX transfer via TronGrid REST API.
+   * Uses tronWeb.trx.sign(transactionObject, privateKey) which — for object inputs —
+   * skips TronWeb's key-format validation entirely (no "Invalid private key" errors).
+   */
+  private async sendTrxDirect(
+    fromAddress: string,
+    toAddress: string,
+    amountSun: number,
+    privateKey: string
+  ): Promise<string> {
+    const baseUrl = config.tron.network === 'mainnet'
+      ? 'https://api.trongrid.io'
+      : 'https://api.shasta.trongrid.io';
+    const headers = { 'TRON-PRO-API-KEY': config.tron.apiKey };
+    const tronWeb = this.getTronWeb();
+
+    const fromHex = tronWeb.address.toHex(fromAddress);
+    const toHex = tronWeb.address.toHex(toAddress);
+
+    const { data: buildData } = await axios.post(
+      `${baseUrl}/wallet/createtransaction`,
+      { owner_address: fromHex, to_address: toHex, amount: amountSun },
+      { headers, timeout: 15000 }
+    );
+    if (!buildData?.txID) throw new Error(`Failed to build TRX tx: ${JSON.stringify(buildData)}`);
+
+    // sign() on an object bypasses TronWeb's key-format validation
+    const signedTx = await tronWeb.trx.sign(buildData, privateKey);
+
+    const { data: broadcastData } = await axios.post(
+      `${baseUrl}/wallet/broadcasttransaction`,
+      signedTx,
+      { headers, timeout: 15000 }
+    );
+    if (!broadcastData?.result) throw new Error(`TRX broadcast failed: ${JSON.stringify(broadcastData)}`);
+
+    return signedTx.txID as string;
+  }
+
+  /**
+   * Build, sign, and broadcast a TRC-20 USDT transfer via TronGrid REST API.
+   * Uses the same validation-bypass pattern as sendTrxDirect.
+   */
+  private async sendUsdtDirect(
+    fromAddress: string,
+    toAddress: string,
+    amountSun: number,
+    privateKey: string
+  ): Promise<string> {
+    const baseUrl = config.tron.network === 'mainnet'
+      ? 'https://api.trongrid.io'
+      : 'https://api.shasta.trongrid.io';
+    const headers = { 'TRON-PRO-API-KEY': config.tron.apiKey };
+    const tronWeb = this.getTronWeb();
+
+    const fromHex = tronWeb.address.toHex(fromAddress);
+    const contractHex = tronWeb.address.toHex(this.usdtContract);
+
+    // ABI-encode transfer(address,uint256) parameters (no function selector)
+    const toHexRaw = tronWeb.address.toHex(toAddress).replace(/^41/, ''); // remove TRON version byte
+    const paddedTo = toHexRaw.padStart(64, '0');                           // 32-byte address
+    const paddedAmount = BigInt(amountSun).toString(16).padStart(64, '0'); // 32-byte uint256
+    const parameter = paddedTo + paddedAmount;
+
+    const { data: triggerData } = await axios.post(
+      `${baseUrl}/wallet/triggersmartcontract`,
+      {
+        owner_address: fromHex,
+        contract_address: contractHex,
+        function_selector: 'transfer(address,uint256)',
+        parameter,
+        fee_limit: 50_000_000,
+        call_value: 0,
+      },
+      { headers, timeout: 15000 }
+    );
+
+    if (!triggerData?.transaction?.txID) {
+      throw new Error(`Failed to build USDT tx: ${JSON.stringify(triggerData)}`);
+    }
+
+    // sign() on an object bypasses TronWeb's key-format validation
+    const signedTx = await tronWeb.trx.sign(triggerData.transaction, privateKey);
+
+    const { data: broadcastData } = await axios.post(
+      `${baseUrl}/wallet/broadcasttransaction`,
+      signedTx,
+      { headers, timeout: 15000 }
+    );
+    if (!broadcastData?.result) throw new Error(`USDT broadcast failed: ${JSON.stringify(broadcastData)}`);
+
+    return signedTx.txID as string;
+  }
+
+  /**
    * Sweep USDT from a user's personal deposit address to the hot wallet.
    * Requires TRON_MNEMONIC to derive the user's private key.
-   * NOTE: The user's deposit address needs TRX for bandwidth. If balance is low,
-   * a small amount of TRX will be sent first automatically.
+   * Uses direct TronGrid API + trx.sign() to bypass TronWeb key validation.
    */
   async sweepUserDeposit(userId: string): Promise<{ success: boolean; txHash?: string; sweptAmount?: number; error?: string }> {
     if (!config.tron.mnemonic) {
@@ -1293,85 +1382,41 @@ class TronService {
       return { success: false, error: `Nothing to sweep: ${usdtBalance} USDT at deposit address` };
     }
 
-    // Read-only TronWeb for resource/balance queries
-    const tronWeb = this.getTronWeb();
-    // Signing TronWeb for hot wallet TRX sends
-    let signingTronWeb: any;
-    try {
-      signingTronWeb = this.getSigningTronWeb();
-    } catch (keyErr: any) {
-      logger.error(`Cannot sweep user ${userId}: hot wallet key error — ${keyErr.message}`);
-      return { success: false, error: `Hot wallet key error: ${keyErr.message}` };
-    }
+    const hotWalletPk = config.tron.privateKey;
+    if (!hotWalletPk) return { success: false, error: 'TRON_PRIVATE_KEY not configured' };
 
-    // TRC-20 USDT transfers require Energy (smart contract execution).
-    // Without staked energy the network burns TRX from the sender (~14,895 energy ≈ 14 TRX at current rates).
-    // Check available energy; if insufficient, send enough TRX to cover the burn.
-    const TRX_FOR_ENERGY = 15; // conservative: covers 1 USDT transfer with no staked energy
-    let trxNeeded = 0;
+    const hotWallet = this.getHotWalletAddress();
+
+    // ── Ensure deposit address has enough TRX for energy (USDT transfer costs ~14 TRX) ──
+    const TRX_FOR_ENERGY = 15;
     try {
+      const tronWeb = this.getTronWeb();
       const resources = await tronWeb.trx.getAccountResources(user.depositAddress);
       const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0);
       const { trx: trxBalance } = await this.fetchAccountData(user.depositAddress);
 
-      if (availableEnergy < 14_895) {
-        // No staked energy — address will burn TRX for fees
-        if (trxBalance < TRX_FOR_ENERGY) {
-          trxNeeded = TRX_FOR_ENERGY - trxBalance;
+      logger.info(`Deposit address ${user.depositAddress}: energy=${availableEnergy}, trx=${trxBalance}`);
+
+      if (availableEnergy < 14_895 && trxBalance < TRX_FOR_ENERGY) {
+        const trxNeeded = TRX_FOR_ENERGY - trxBalance;
+        const { trx: hotTrx } = await this.fetchAccountData(hotWallet);
+        if (hotTrx < trxNeeded + 1) {
+          return { success: false, error: `Hot wallet only has ${hotTrx.toFixed(2)} TRX — need ${(trxNeeded + 1).toFixed(0)} TRX to fund sweep` };
         }
+        logger.info(`Sending ${trxNeeded} TRX from hot wallet to ${user.depositAddress} for energy`);
+        await this.sendTrxDirect(hotWallet, user.depositAddress, Math.floor(trxNeeded * 1_000_000), hotWalletPk);
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
-      logger.info(`Deposit address ${user.depositAddress}: energy=${availableEnergy}, trxBalance=${trxBalance}, trxNeeded=${trxNeeded}`);
-    } catch {
-      // Can't check resources — send TRX to be safe
-      const trxBalance = (await tronWeb.trx.getBalance(user.depositAddress)) / 1_000_000;
-      if (trxBalance < TRX_FOR_ENERGY) trxNeeded = TRX_FOR_ENERGY - trxBalance;
+    } catch (energyErr: any) {
+      logger.warn(`Energy check failed, proceeding anyway: ${energyErr.message}`);
     }
 
-    if (trxNeeded > 0) {
-      // Verify hot wallet has enough TRX before attempting top-up
-      const { trx: hotTrx } = await this.fetchAccountData(this.getHotWalletAddress());
-      if (hotTrx < trxNeeded + 1) {
-        return { success: false, error: `Hot wallet only has ${hotTrx.toFixed(2)} TRX — need ${trxNeeded + 1} TRX to fund sweep. Please top up hot wallet.` };
-      }
-      logger.info(`Sending ${trxNeeded} TRX to deposit address ${user.depositAddress} for energy`);
-      try {
-        await signingTronWeb.trx.sendTransaction(user.depositAddress, Math.floor(trxNeeded * 1_000_000));
-        await new Promise(resolve => setTimeout(resolve, 5000)); // wait for confirmation
-      } catch (err: any) {
-        logger.warn(`Could not send TRX for energy: ${err.message}`);
-      }
-    }
-
-    // Derive the private key for this user's wallet index
-    const { privateKey } = this.deriveWallet(user.walletIndex);
-
-    const fullHost = config.tron.network === 'mainnet'
-      ? 'https://api.trongrid.io'
-      : 'https://api.shasta.trongrid.io';
-
-    let sweepTronWeb: any;
-    try {
-      sweepTronWeb = new TronWeb({
-        fullHost,
-        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-        privateKey,
-      });
-    } catch {
-      sweepTronWeb = new TronWeb({
-        fullHost,
-        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-      });
-      sweepTronWeb.setPrivateKey(privateKey);
-      sweepTronWeb.setAddress(user.depositAddress);
-    }
-
-    const hotWallet = this.getHotWalletAddress();
+    // ── Sweep USDT from deposit address to hot wallet ──
+    const { privateKey: depositPk } = this.deriveWallet(user.walletIndex);
     const amountInSun = Math.floor(usdtBalance * 1_000_000);
 
     try {
-      const contract = await sweepTronWeb.contract().at(this.usdtContract);
-      const tx = await contract.transfer(hotWallet, amountInSun).send({ feeLimit: 50_000_000 });
-      const txHash = typeof tx === 'string' ? tx : tx.txid || tx.transaction?.txID;
+      const txHash = await this.sendUsdtDirect(user.depositAddress, hotWallet, amountInSun, depositPk);
 
       logger.info(`Swept ${usdtBalance} USDT from user ${userId} deposit address to hot wallet. TX: ${txHash}`);
 
