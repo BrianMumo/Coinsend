@@ -392,6 +392,10 @@ const AdminUsersPage = () => {
 
               {/* User Info */}
               <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-gray-50 rounded-lg p-3 col-span-2">
+                  <p className="text-gray-500 text-xs mb-1">User ID</p>
+                  <p className="font-mono text-xs break-all select-all">{selectedUser.id}</p>
+                </div>
                 <div className="bg-gray-50 rounded-lg p-3">
                   <p className="text-gray-500 text-xs mb-1">Email</p>
                   <p className="font-medium truncate">{selectedUser.email}</p>
