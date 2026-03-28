@@ -2,10 +2,19 @@ import { Router, Response } from 'express';
 import { body, query } from 'express-validator';
 import { authenticate, AuthRequest } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validator';
-import { asyncHandler } from '../middleware/errorHandler';
+import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { balanceService } from '../services/balance.service';
 import { tronService } from '../services/tron.service';
 import { logger } from '../utils/logger';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function assertWithdrawalsEnabled() {
+  const cfg = await prisma.systemConfig.findUnique({ where: { key: 'withdrawalsEnabled' } });
+  const enabled = cfg ? cfg.value === 'true' : true;
+  if (!enabled) throw new AppError('Withdrawals are temporarily disabled. Please try again later.', 503);
+}
 
 const router = Router();
 
@@ -169,6 +178,7 @@ router.post(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { amount, phoneNumber } = req.body;
 
+    await assertWithdrawalsEnabled();
     logger.info(`Withdrawal request from user ${req.user!.userId}: Amount ${amount}, Phone ${phoneNumber}`);
 
     const result = await balanceService.initiateWithdrawal(
@@ -235,6 +245,7 @@ router.post(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { amount, phoneNumber } = req.body;
 
+    await assertWithdrawalsEnabled();
     logger.info(`KES withdrawal request from user ${req.user!.userId}: ${amount} USDT, Phone ${phoneNumber}`);
 
     const result = await balanceService.withdrawToKes(
@@ -315,6 +326,7 @@ router.post(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { amount, walletAddress } = req.body;
 
+    await assertWithdrawalsEnabled();
     logger.info(`USDT withdrawal request from user ${req.user!.userId}: Amount ${amount}, Address ${walletAddress}`);
 
     const result = await balanceService.withdrawUsdt(

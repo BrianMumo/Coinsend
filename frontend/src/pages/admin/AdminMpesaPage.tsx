@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { PageTitle } from '../../components/ui/PageTitle';
 import { ConfirmModal } from '../../components/ui/Modal';
 import { adminMpesaApi, adminBalanceApi, PendingBalanceTransaction } from '../../api/admin.api';
+import { adminApi } from '../../api/client';
 import { MpesaTransaction, MpesaBalance } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { useAdminAuthStore } from '../../store/adminAuthStore';
@@ -26,6 +27,8 @@ import {
   RotateCcw,
   Filter,
   X,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react';
 
 const AdminMpesaPage = () => {
@@ -70,9 +73,36 @@ const AdminMpesaPage = () => {
   // Selected transaction for detail view
   const [selectedTx, setSelectedTx] = useState<MpesaTransaction | null>(null);
 
+  // Withdrawal toggle
+  const [withdrawalsEnabled, setWithdrawalsEnabled] = useState<boolean>(true);
+  const [isTogglingWithdrawals, setIsTogglingWithdrawals] = useState(false);
+
   // Messages
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Fetch withdrawal status
+  const fetchWithdrawalStatus = async () => {
+    try {
+      const res = await adminApi.get('/admin/settings/withdrawals');
+      setWithdrawalsEnabled(res.data?.data?.withdrawalsEnabled ?? true);
+    } catch { /* ignore */ }
+  };
+
+  const handleToggleWithdrawals = async () => {
+    setIsTogglingWithdrawals(true);
+    setError(null);
+    try {
+      const res = await adminApi.post('/admin/settings/withdrawals', { enabled: !withdrawalsEnabled });
+      setWithdrawalsEnabled(res.data?.data?.withdrawalsEnabled);
+      setSuccess(res.data?.message);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Failed to update withdrawal status');
+    } finally {
+      setIsTogglingWithdrawals(false);
+    }
+  };
 
   // Fetch balance
   const fetchBalance = async () => {
@@ -236,6 +266,7 @@ const AdminMpesaPage = () => {
     fetchBalance();
     fetchTransactions();
     fetchPendingBalanceTx();
+    fetchWithdrawalStatus();
   }, []);
 
   useEffect(() => {
@@ -309,6 +340,32 @@ const AdminMpesaPage = () => {
 
       {success && <Alert variant="success">{success}</Alert>}
       {error && <Alert variant="error">{error}</Alert>}
+
+      {/* Withdrawal Toggle */}
+      <div className={`flex items-center justify-between rounded-xl p-4 border-2 ${withdrawalsEnabled ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+        <div className="flex items-center gap-3">
+          {withdrawalsEnabled
+            ? <ToggleRight className="h-6 w-6 text-green-600" />
+            : <ToggleLeft className="h-6 w-6 text-red-500" />}
+          <div>
+            <p className="font-semibold text-sm text-gray-900">Withdrawals</p>
+            <p className={`text-xs font-medium ${withdrawalsEnabled ? 'text-green-600' : 'text-red-500'}`}>
+              {withdrawalsEnabled ? 'Enabled — users can withdraw' : 'Disabled — all withdrawals blocked'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleToggleWithdrawals}
+          disabled={isTogglingWithdrawals}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+            withdrawalsEnabled
+              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+              : 'bg-green-100 text-green-700 hover:bg-green-200'
+          }`}
+        >
+          {isTogglingWithdrawals ? 'Updating...' : withdrawalsEnabled ? 'Turn Off' : 'Turn On'}
+        </button>
+      </div>
 
       {/* Balance Cards - Compact */}
       <div className="grid grid-cols-2 gap-3">

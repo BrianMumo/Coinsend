@@ -1393,4 +1393,32 @@ router.post(
   })
 );
 
+// ============ WITHDRAWAL TOGGLE ============
+
+// GET current withdrawal status
+router.get(
+  '/settings/withdrawals',
+  asyncHandler(async (_req: AdminRequest, res: Response) => {
+    const config = await prisma.systemConfig.findUnique({ where: { key: 'withdrawalsEnabled' } });
+    const enabled = config ? config.value === 'true' : true; // default ON
+    res.json({ success: true, data: { withdrawalsEnabled: enabled } });
+  })
+);
+
+// POST toggle withdrawals on/off
+router.post(
+  '/settings/withdrawals',
+  requireRole('SUPER_ADMIN', 'ADMIN'),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') throw new AppError('enabled must be a boolean', 400);
+    await prisma.systemConfig.upsert({
+      where: { key: 'withdrawalsEnabled' },
+      update: { value: String(enabled) },
+      create: { key: 'withdrawalsEnabled', value: String(enabled) },
+    });
+    res.json({ success: true, data: { withdrawalsEnabled: enabled }, message: `Withdrawals ${enabled ? 'enabled' : 'disabled'}` });
+  })
+);
+
 export default router;
