@@ -40,10 +40,10 @@ export const config = {
   tron: {
     network: process.env.TRON_NETWORK || 'mainnet', // 'mainnet' or 'shasta' (testnet)
     apiKey: process.env.TRON_API_KEY || '',
-    privateKey: process.env.TRON_PRIVATE_KEY || '',
+    privateKey: (process.env.TRON_PRIVATE_KEY || '').trim(),
     hotWalletAddress: process.env.TRON_HOT_WALLET || '',
     usdtContract: process.env.TRON_USDT_CONTRACT || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', // Mainnet USDT
-    mnemonic: process.env.TRON_MNEMONIC || '', // BIP39 mnemonic for HD wallet (per-user deposit addresses)
+    mnemonic: (process.env.TRON_MNEMONIC || '').trim(), // BIP39 mnemonic for HD wallet (per-user deposit addresses)
   },
 
   telegram: {
