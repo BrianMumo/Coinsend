@@ -486,6 +486,46 @@ class TronService {
       logger.error('Failed to process pending sweeps:', error.message);
     }
 
+    // ── 4. Periodic balance scan: find deposit addresses still holding USDT ──
+    // Runs every 10 minutes to catch any deposits that slipped through (e.g.
+    // deposited before queue code was deployed, or missed due to API errors).
+    try {
+      const lastScan = await prisma.systemConfig.findUnique({ where: { key: 'lastBalanceScanTimestamp' } });
+      const sinceLastScan = lastScan ? Date.now() - parseInt(lastScan.value) : Infinity;
+
+      if (sinceLastScan > 10 * 60 * 1000) {
+        await prisma.systemConfig.upsert({
+          where: { key: 'lastBalanceScanTimestamp' },
+          update: { value: Date.now().toString() },
+          create: { key: 'lastBalanceScanTimestamp', value: Date.now().toString() },
+        });
+
+        const usersWithAddresses = await prisma.user.findMany({
+          where: { depositAddress: { not: null }, isActive: true },
+          select: { id: true, depositAddress: true },
+        });
+
+        for (const user of usersWithAddresses) {
+          if (!user.depositAddress) continue;
+          try {
+            const balance = await this.getUsdtBalanceOf(user.depositAddress);
+            if (balance >= 0.5) {
+              logger.info(`Balance scan: found ${balance} USDT at user ${user.id} deposit address — queuing sweep`);
+              await prisma.systemConfig.upsert({
+                where: { key: `pendingSweep_${user.id}` },
+                update: { value: 'true' },
+                create: { key: `pendingSweep_${user.id}`, value: 'true' },
+              });
+            }
+          } catch (err: any) {
+            logger.error(`Balance scan failed for user ${user.id}: ${err.message}`);
+          }
+        }
+      }
+    } catch (error: any) {
+      logger.error('Failed to run balance scan:', error.message);
+    }
+
     if (totalDeposits > 0) {
       logger.info(`Processed ${totalDeposits} new USDT deposits total`);
     }

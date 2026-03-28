@@ -439,6 +439,12 @@ export const adminTronApi = {
     return response.data;
   },
 
+  // Sweep all user deposit addresses to hot wallet
+  sweepAll: async (): Promise<ApiResponse<{ swept: number; results: any[] }>> => {
+    const response = await adminApi.post('/admin/tron/sweep-all');
+    return response.data;
+  },
+
   // Send USDT
   sendUsdt: async (
     toAddress: string,

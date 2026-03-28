@@ -1219,6 +1219,35 @@ router.post(
   })
 );
 
+// Sweep ALL user deposit addresses that hold USDT to hot wallet
+router.post(
+  '/tron/sweep-all',
+  requireRole('SUPER_ADMIN'),
+  asyncHandler(async (_req: AdminRequest, res: Response) => {
+    const usersWithAddresses = await prisma.user.findMany({
+      where: { depositAddress: { not: null }, isActive: true },
+      select: { id: true, depositAddress: true },
+    });
+
+    const results: Array<{ userId: string; address: string; result: any }> = [];
+
+    for (const user of usersWithAddresses) {
+      if (!user.depositAddress) continue;
+      const balance = await tronService.getUsdtBalanceOf(user.depositAddress);
+      if (balance < 0.5) continue;
+
+      const result = await tronService.sweepUserDeposit(user.id);
+      results.push({ userId: user.id, address: user.depositAddress, result });
+
+      if (result.success) {
+        await prisma.systemConfig.deleteMany({ where: { key: `pendingSweep_${user.id}` } });
+      }
+    }
+
+    res.json({ success: true, data: { swept: results.length, results } });
+  })
+);
+
 // Reset a user's personal deposit address (re-derives a fresh one)
 // Use when the assigned address conflicts with the hot wallet or needs rotation
 router.post(

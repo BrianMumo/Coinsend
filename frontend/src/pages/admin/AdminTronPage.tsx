@@ -46,6 +46,7 @@ const AdminTronPage = () => {
 
   // Check deposits state
   const [isCheckingDeposits, setIsCheckingDeposits] = useState(false);
+  const [isSweepingAll, setIsSweepingAll] = useState(false);
 
   // Messages
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +119,26 @@ const AdminTronPage = () => {
       setError(err.response?.data?.error?.message || 'Failed to check deposits');
     } finally {
       setIsCheckingDeposits(false);
+    }
+  };
+
+  // Sweep all user deposit addresses to hot wallet
+  const handleSweepAll = async () => {
+    setIsSweepingAll(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await adminTronApi.sweepAll();
+      if (response.success) {
+        const count = response.data?.swept || 0;
+        setSuccess(count > 0 ? `Swept ${count} deposit address(es) to hot wallet.` : 'No deposit addresses with balance found.');
+        fetchWallet();
+        fetchTransactions();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Sweep failed');
+    } finally {
+      setIsSweepingAll(false);
     }
   };
 
@@ -315,6 +336,19 @@ const AdminTronPage = () => {
               <Search className="h-4 w-4 mr-2" />
               Check for Deposits
             </Button>
+
+            {/* Sweep All */}
+            {isSuperAdmin && (
+              <Button
+                onClick={handleSweepAll}
+                isLoading={isSweepingAll}
+                className="w-full"
+                variant="outline"
+              >
+                <ArrowDownCircle className="h-4 w-4 mr-2" />
+                Sweep All to Hot Wallet
+              </Button>
+            )}
 
             {/* Refresh */}
             <Button
