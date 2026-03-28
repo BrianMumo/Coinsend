@@ -19,7 +19,7 @@ const USDT_CONTRACTS: Record<string, string> = {
 
 
 class TronService {
-  private tronWeb: any = null;
+  private tronWeb: any = null;       // read-only, no private key
   private usdtContract: string;
 
   constructor() {
@@ -27,37 +27,42 @@ class TronService {
   }
 
   /**
-   * Initialize TronWeb instance
+   * Read-only TronWeb instance — no private key, safe for balance/event queries.
    */
   private getTronWeb(): any {
     if (!this.tronWeb) {
       if (!config.tron.apiKey) {
         throw new Error('TRON_API_KEY is not configured');
       }
-
       const fullHost = config.tron.network === 'mainnet'
         ? 'https://api.trongrid.io'
         : 'https://api.shasta.trongrid.io';
-
-      const pk = config.tron.privateKey;
-
-      // Try initializing with private key; fall back to read-only if it fails
-      try {
-        this.tronWeb = new TronWeb({
-          fullHost,
-          headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-          privateKey: pk || undefined,
-        });
-      } catch {
-        logger.warn('TronWeb init with private key failed — initializing in read-only mode');
-        this.tronWeb = new TronWeb({
-          fullHost,
-          headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-        });
-      }
+      // Read-only: no privateKey passed — avoids 'Invalid private key provided' errors
+      this.tronWeb = new TronWeb({
+        fullHost,
+        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+      });
     }
-
     return this.tronWeb;
+  }
+
+  /**
+   * Signing TronWeb instance — includes the hot wallet private key.
+   * Only used for send/sweep operations that require signing.
+   */
+  private getSigningTronWeb(): any {
+    const pk = config.tron.privateKey;
+    if (!pk) throw new Error('TRON_PRIVATE_KEY is not configured');
+
+    const fullHost = config.tron.network === 'mainnet'
+      ? 'https://api.trongrid.io'
+      : 'https://api.shasta.trongrid.io';
+
+    return new TronWeb({
+      fullHost,
+      headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+      privateKey: pk,
+    });
   }
 
   /**
@@ -225,11 +230,11 @@ class TronService {
       return { success: false, error: 'Private key not configured' };
     }
 
-    const tronWeb = this.getTronWeb();
+    const readTronWeb = this.getTronWeb();
 
     try {
       // Validate address
-      if (!tronWeb.isAddress(toAddress)) {
+      if (!readTronWeb.isAddress(toAddress)) {
         return { success: false, error: 'Invalid TRON address' };
       }
 
@@ -238,6 +243,9 @@ class TronService {
       if (balance < amount) {
         return { success: false, error: `Insufficient USDT balance. Have: ${balance}, Need: ${amount}` };
       }
+
+      // Use signing TronWeb for the actual transfer
+      const tronWeb = this.getSigningTronWeb();
 
       // Get contract instance
       const contract = await tronWeb.contract().at(this.usdtContract);
@@ -1252,7 +1260,10 @@ class TronService {
       return { success: false, error: `Nothing to sweep: ${usdtBalance} USDT at deposit address` };
     }
 
+    // Read-only TronWeb for resource/balance queries
     const tronWeb = this.getTronWeb();
+    // Signing TronWeb for hot wallet TRX sends
+    const signingTronWeb = this.getSigningTronWeb();
 
     // TRC-20 USDT transfers require Energy (smart contract execution).
     // Without staked energy the network burns TRX from the sender (~14,895 energy ≈ 14 TRX at current rates).
@@ -1285,7 +1296,7 @@ class TronService {
       }
       logger.info(`Sending ${trxNeeded} TRX to deposit address ${user.depositAddress} for energy`);
       try {
-        await tronWeb.trx.sendTransaction(user.depositAddress, Math.floor(trxNeeded * 1_000_000));
+        await signingTronWeb.trx.sendTransaction(user.depositAddress, Math.floor(trxNeeded * 1_000_000));
         await new Promise(resolve => setTimeout(resolve, 5000)); // wait for confirmation
       } catch (err: any) {
         logger.warn(`Could not send TRX for energy: ${err.message}`);
