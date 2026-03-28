@@ -180,46 +180,53 @@ class TronService {
   }
 
   /**
+   * Fetch account data from TronGrid REST API (no TronWeb / no private key needed).
+   */
+  private async fetchAccountData(address: string): Promise<{ trx: number; usdt: number }> {
+    const baseUrl = config.tron.network === 'mainnet'
+      ? 'https://api.trongrid.io'
+      : 'https://api.shasta.trongrid.io';
+    try {
+      const response = await axios.get(`${baseUrl}/v1/accounts/${address}`, {
+        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+        timeout: 10000,
+      });
+      const data = response.data?.data?.[0];
+      if (!data) return { trx: 0, usdt: 0 };
+
+      const trx = (data.balance || 0) / 1_000_000;
+      const trc20: Array<Record<string, string>> = data.trc20 || [];
+      const usdtEntry = trc20.find(t => Object.keys(t)[0]?.toLowerCase() === this.usdtContract.toLowerCase());
+      const usdt = usdtEntry ? Number(Object.values(usdtEntry)[0]) / 1_000_000 : 0;
+      return { trx, usdt };
+    } catch (error: any) {
+      logger.error(`Failed to fetch account data for ${address}:`, error.message);
+      return { trx: 0, usdt: 0 };
+    }
+  }
+
+  /**
    * Get TRX balance of the hot wallet
    */
   async getTrxBalance(): Promise<number> {
-    const tronWeb = this.getTronWeb();
-    const address = this.getHotWalletAddress();
-    const balance = await tronWeb.trx.getBalance(address);
-    return balance / 1_000_000; // Convert from SUN to TRX
+    const { trx } = await this.fetchAccountData(this.getHotWalletAddress());
+    return trx;
   }
 
   /**
    * Get USDT balance of the hot wallet
    */
   async getUsdtBalance(): Promise<number> {
-    const tronWeb = this.getTronWeb();
-    const address = this.getHotWalletAddress();
-
-    try {
-      const contract = await tronWeb.contract().at(this.usdtContract);
-      const balance = await contract.balanceOf(address).call();
-      return Number(balance) / 1_000_000; // USDT has 6 decimals
-    } catch (error: any) {
-      logger.error('Failed to get USDT balance:', error.message);
-      throw new Error('Failed to get USDT balance');
-    }
+    const { usdt } = await this.fetchAccountData(this.getHotWalletAddress());
+    return usdt;
   }
 
   /**
    * Get USDT balance of any address
    */
   async getUsdtBalanceOf(address: string): Promise<number> {
-    const tronWeb = this.getTronWeb();
-
-    try {
-      const contract = await tronWeb.contract().at(this.usdtContract);
-      const balance = await contract.balanceOf(address).call();
-      return Number(balance) / 1_000_000;
-    } catch (error: any) {
-      logger.error(`Failed to get USDT balance for ${address}:`, error.message);
-      return 0;
-    }
+    const { usdt } = await this.fetchAccountData(address);
+    return usdt;
   }
 
   /**
@@ -1277,7 +1284,7 @@ class TronService {
     try {
       const resources = await tronWeb.trx.getAccountResources(user.depositAddress);
       const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0);
-      const trxBalance = (await tronWeb.trx.getBalance(user.depositAddress)) / 1_000_000;
+      const { trx: trxBalance } = await this.fetchAccountData(user.depositAddress);
 
       if (availableEnergy < 14_895) {
         // No staked energy — address will burn TRX for fees
@@ -1294,7 +1301,7 @@ class TronService {
 
     if (trxNeeded > 0) {
       // Verify hot wallet has enough TRX before attempting top-up
-      const hotTrx = (await tronWeb.trx.getBalance(this.getHotWalletAddress())) / 1_000_000;
+      const { trx: hotTrx } = await this.fetchAccountData(this.getHotWalletAddress());
       if (hotTrx < trxNeeded + 1) {
         return { success: false, error: `Hot wallet only has ${hotTrx.toFixed(2)} TRX — need ${trxNeeded + 1} TRX to fund sweep. Please top up hot wallet.` };
       }
