@@ -97,12 +97,14 @@ class TronService {
     }
     const path = `m/44'/195'/0'/0/${index}`;
     try {
-      // TronWeb 6.x static method – returns a TronWeb instance configured with the derived key
-      const hdTronWeb = TronWeb.fromMnemonic(config.tron.mnemonic, path);
-      const address: string = hdTronWeb.defaultAddress?.base58 ?? hdTronWeb.address?.base58;
-      const privateKey: string = hdTronWeb.defaultPrivateKey ?? hdTronWeb.privateKey;
+      // TronWeb 6.x: fromMnemonic returns { address, privateKey, publicKey, mnemonic }
+      const wallet = TronWeb.fromMnemonic(config.tron.mnemonic, path);
+      const address: string = typeof wallet.address === 'string'
+        ? wallet.address
+        : wallet.address?.base58 ?? wallet.defaultAddress?.base58;
+      const privateKey: string = wallet.privateKey ?? wallet.defaultPrivateKey;
       if (!address || !privateKey) {
-        throw new Error('fromMnemonic returned unexpected result');
+        throw new Error(`fromMnemonic returned unexpected shape: ${JSON.stringify(Object.keys(wallet))}`);
       }
       return { address, privateKey };
     } catch (error: any) {
