@@ -1144,7 +1144,10 @@ class TronService {
     ]);
 
     return {
-      data: transactions,
+      data: transactions.map(tx => ({
+        ...tx,
+        blockNumber: tx.blockNumber != null ? tx.blockNumber.toString() : null,
+      })),
       pagination: {
         page,
         limit,
