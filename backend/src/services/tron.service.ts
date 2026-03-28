@@ -57,16 +57,31 @@ class TronService {
   private getSigningTronWeb(): any {
     const pk = config.tron.privateKey;
     if (!pk) throw new Error('TRON_PRIVATE_KEY is not configured');
+    if (!/^[0-9a-fA-F]{64}$/.test(pk)) {
+      throw new Error(`TRON_PRIVATE_KEY has invalid format (${pk.length} chars after sanitization). Expected 64 hex chars.`);
+    }
 
     const fullHost = config.tron.network === 'mainnet'
       ? 'https://api.trongrid.io'
       : 'https://api.shasta.trongrid.io';
 
-    return new TronWeb({
-      fullHost,
-      headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-      privateKey: pk,
-    });
+    try {
+      return new TronWeb({
+        fullHost,
+        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+        privateKey: pk,
+      });
+    } catch (constructorErr: any) {
+      // TronWeb constructor rejects key — try setPrivateKey() which has looser validation
+      logger.warn(`TronWeb constructor rejected key (${constructorErr.message}), trying setPrivateKey fallback`);
+      const tw = new TronWeb({
+        fullHost,
+        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+      });
+      tw.setPrivateKey(pk);
+      if (config.tron.hotWalletAddress) tw.setAddress(config.tron.hotWalletAddress);
+      return tw;
+    }
   }
 
   /**
@@ -1242,7 +1257,14 @@ class TronService {
       };
     } catch (error: any) {
       logger.error('Failed to get wallet summary:', error.message);
-      throw error;
+      // Return a partial summary rather than throwing — the admin page must always load
+      return {
+        hotWallet: config.tron.hotWalletAddress || 'Not configured',
+        network: config.tron.network,
+        balances: { trx: 0, usdt: 0 },
+        today: { deposits: { count: 0, amount: 0 }, withdrawals: { count: 0, amount: 0 } },
+        error: error.message,
+      };
     }
   }
 
@@ -1274,7 +1296,13 @@ class TronService {
     // Read-only TronWeb for resource/balance queries
     const tronWeb = this.getTronWeb();
     // Signing TronWeb for hot wallet TRX sends
-    const signingTronWeb = this.getSigningTronWeb();
+    let signingTronWeb: any;
+    try {
+      signingTronWeb = this.getSigningTronWeb();
+    } catch (keyErr: any) {
+      logger.error(`Cannot sweep user ${userId}: hot wallet key error — ${keyErr.message}`);
+      return { success: false, error: `Hot wallet key error: ${keyErr.message}` };
+    }
 
     // TRC-20 USDT transfers require Energy (smart contract execution).
     // Without staked energy the network burns TRX from the sender (~14,895 energy ≈ 14 TRX at current rates).
@@ -1321,11 +1349,21 @@ class TronService {
       ? 'https://api.trongrid.io'
       : 'https://api.shasta.trongrid.io';
 
-    const sweepTronWeb = new TronWeb({
-      fullHost,
-      headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-      privateKey,
-    });
+    let sweepTronWeb: any;
+    try {
+      sweepTronWeb = new TronWeb({
+        fullHost,
+        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+        privateKey,
+      });
+    } catch {
+      sweepTronWeb = new TronWeb({
+        fullHost,
+        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+      });
+      sweepTronWeb.setPrivateKey(privateKey);
+      sweepTronWeb.setAddress(user.depositAddress);
+    }
 
     const hotWallet = this.getHotWalletAddress();
     const amountInSun = Math.floor(usdtBalance * 1_000_000);

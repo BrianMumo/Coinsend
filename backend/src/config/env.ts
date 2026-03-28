@@ -40,7 +40,8 @@ export const config = {
   tron: {
     network: process.env.TRON_NETWORK || 'mainnet', // 'mainnet' or 'shasta' (testnet)
     apiKey: process.env.TRON_API_KEY || '',
-    privateKey: (process.env.TRON_PRIVATE_KEY || '').trim(),
+    // Strip ALL non-hex characters (handles hidden chars, BOM, CRLF, zero-width spaces, etc.)
+    privateKey: (process.env.TRON_PRIVATE_KEY || '').replace(/[^0-9a-fA-F]/g, ''),
     hotWalletAddress: process.env.TRON_HOT_WALLET || '',
     usdtContract: process.env.TRON_USDT_CONTRACT || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', // Mainnet USDT
     mnemonic: (process.env.TRON_MNEMONIC || '').trim(), // BIP39 mnemonic for HD wallet (per-user deposit addresses)
