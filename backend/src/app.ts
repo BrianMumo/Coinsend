@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config/env';
+
+// Allow BigInt values to be serialized to JSON (Prisma returns BigInt for blockNumber)
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import { logger } from './utils/logger';
