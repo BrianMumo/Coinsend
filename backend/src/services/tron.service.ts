@@ -42,6 +42,10 @@ class TronService {
         fullHost,
         headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
       });
+      // Set a default address so TRC-20 view calls (balanceOf) work correctly
+      if (config.tron.hotWalletAddress) {
+        this.tronWeb.setAddress(config.tron.hotWalletAddress);
+      }
     }
     return this.tronWeb;
   }
