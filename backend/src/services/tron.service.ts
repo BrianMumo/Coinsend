@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { config } from '../config/env';
 import { logger } from '../utils/logger';
 import { PrismaClient } from '@prisma/client';
@@ -16,16 +17,6 @@ const USDT_CONTRACTS: Record<string, string> = {
   shasta: 'TG3XXyExBkPp9nzdajDZsozEu4BkaSJozs', // Shasta testnet USDT
 };
 
-interface TransferEvent {
-  transaction: string;
-  result: {
-    from: string;
-    to: string;
-    value: string;
-  };
-  block: number;
-  timestamp: number;
-}
 
 class TronService {
   private tronWeb: any = null;
@@ -359,14 +350,52 @@ class TronService {
   }
 
   /**
+   * Fetch incoming USDT transfers to an address using TronGrid TRC-20 API.
+   * More reliable than getEventResult/event filters.
+   */
+  private async fetchIncomingUsdt(address: string, sinceTimestamp: number): Promise<Array<{
+    txHash: string;
+    from: string;
+    to: string;
+    amount: number;
+    blockTimestamp: number;
+  }>> {
+    const baseUrl = config.tron.network === 'mainnet'
+      ? 'https://api.trongrid.io'
+      : 'https://api.shasta.trongrid.io';
+
+    // Use a 3-minute buffer to account for TronGrid indexing delay
+    const minTimestamp = Math.max(0, sinceTimestamp - 180_000);
+
+    const url = `${baseUrl}/v1/accounts/${address}/transactions/trc20`;
+    const response = await axios.get(url, {
+      params: {
+        only_to: true,
+        contract_address: this.usdtContract,
+        min_timestamp: minTimestamp,
+        limit: 200,
+        order_by: 'block_timestamp,asc',
+      },
+      headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+      timeout: 15000,
+    });
+
+    const data: any[] = response.data?.data || [];
+    return data.map((tx: any) => ({
+      txHash: tx.transaction_id,
+      from: tx.from,
+      to: tx.to,
+      amount: Number(tx.value) / 1_000_000,
+      blockTimestamp: tx.block_timestamp,
+    }));
+  }
+
+  /**
    * Check for new incoming USDT deposits.
    * Monitors both the shared hot wallet (legacy) and each user's personal deposit address.
    */
   async checkNewDeposits(): Promise<number> {
-    const tronWeb = this.getTronWeb();
     const hotWallet = this.getHotWalletAddress();
-    const hotWalletHex = tronWeb.address.toHex(hotWallet);
-
     let totalDeposits = 0;
 
     // ── 1. Check hot wallet (legacy / backward-compatible flow) ──────────────
@@ -378,16 +407,10 @@ class TronService {
         ? parseInt(lastCheck.value)
         : Date.now() - 3600000;
 
-      const events = await tronWeb.getEventResult(this.usdtContract, {
-        eventName: 'Transfer',
-        sinceTimestamp,
-        filters: { to: hotWalletHex },
-      }) as TransferEvent[];
+      const transfers = await this.fetchIncomingUsdt(hotWallet, sinceTimestamp);
 
-      for (const event of events) {
-        const txHash = event.transaction;
-        const amount = Number(event.result.value) / 1_000_000;
-        const fromAddress = tronWeb.address.fromHex(event.result.from);
+      for (const transfer of transfers) {
+        const { txHash, from: fromAddress, amount } = transfer;
         const existing = await prisma.cryptoTransaction.findUnique({ where: { txHash } });
 
         if (!existing && amount > 0) {
@@ -403,9 +426,8 @@ class TronService {
               fromAddress,
               toAddress: hotWallet,
               amount,
-              blockNumber: BigInt(event.block),
               confirmations: 19,
-              confirmedAt: new Date(event.timestamp),
+              confirmedAt: new Date(transfer.blockTimestamp),
               notes: `Deposit of ${amount} USDT from ${fromAddress}`,
             },
           });
@@ -475,8 +497,6 @@ class TronService {
    * Check a single user deposit address for new incoming USDT transfers.
    */
   private async checkUserAddress(address: string, userId: string): Promise<number> {
-    const tronWeb = this.getTronWeb();
-    const addressHex = tronWeb.address.toHex(address);
     const configKey = `lastCheck_${address}`;
 
     const lastCheck = await prisma.systemConfig.findUnique({ where: { key: configKey } });
@@ -484,11 +504,7 @@ class TronService {
       ? parseInt(lastCheck.value)
       : Date.now() - 86400000; // default: last 24 hours
 
-    const events = await tronWeb.getEventResult(this.usdtContract, {
-      eventName: 'Transfer',
-      sinceTimestamp,
-      filters: { to: addressHex },
-    }) as TransferEvent[];
+    const transfers = await this.fetchIncomingUsdt(address, sinceTimestamp);
 
     await prisma.systemConfig.upsert({
       where: { key: configKey },
@@ -497,10 +513,8 @@ class TronService {
     });
 
     let newDeposits = 0;
-    for (const event of events) {
-      const txHash = event.transaction;
-      const amount = Number(event.result.value) / 1_000_000;
-      const fromAddress = tronWeb.address.fromHex(event.result.from);
+    for (const transfer of transfers) {
+      const { txHash, from: fromAddress, amount } = transfer;
       const existing = await prisma.cryptoTransaction.findUnique({ where: { txHash } });
 
       if (!existing && amount > 0) {
@@ -516,9 +530,8 @@ class TronService {
             fromAddress,
             toAddress: address,
             amount,
-            blockNumber: BigInt(event.block),
             confirmations: 19,
-            confirmedAt: new Date(event.timestamp),
+            confirmedAt: new Date(transfer.blockTimestamp),
             notes: `Deposit to user personal wallet from ${fromAddress}`,
           },
         });
