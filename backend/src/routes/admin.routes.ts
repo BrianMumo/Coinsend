@@ -1282,6 +1282,49 @@ router.post(
   })
 );
 
+// Derive the private key for a user's deposit address — SUPER_ADMIN only.
+// Use this to import the key into TronLink and manually recover stuck USDT.
+// WARNING: treat this key like a password. Do not share it.
+router.get(
+  '/users/:userId/deposit-key',
+  requireRole('SUPER_ADMIN'),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, depositAddress: true, walletIndex: true },
+    });
+
+    if (!user) throw new AppError('User not found', 404);
+    if (!user.depositAddress || user.walletIndex === null || user.walletIndex === undefined) {
+      throw new AppError('This user has no personal deposit address assigned', 400);
+    }
+
+    const { address, privateKey } = tronService.deriveWallet(user.walletIndex);
+
+    // Sanity-check: derived address must match what is stored for this user
+    if (address.toLowerCase() !== user.depositAddress.toLowerCase()) {
+      throw new AppError(
+        `Key mismatch: derived address ${address} does not match stored ${user.depositAddress}. ` +
+        `Check TRON_MNEMONIC or wallet index.`,
+        500
+      );
+    }
+
+    res.json({
+      success: true,
+      data: {
+        userId: user.id,
+        email: user.email,
+        depositAddress: user.depositAddress,
+        walletIndex: user.walletIndex,
+        privateKey, // 64-char hex — import directly into TronLink
+      },
+    });
+  })
+);
+
 // Credit user balance manually (for missed deposits)
 router.post(
   '/users/:userId/credit-deposit',
