@@ -133,15 +133,31 @@ class TronService {
       return this.getHotWalletAddress();
     }
 
+    // Get hot wallet address to ensure we never assign it to a user
+    let hotWalletLower = '';
+    try { hotWalletLower = this.getHotWalletAddress().toLowerCase(); } catch { /* not yet configured */ }
+
     // Find the next available index (max assigned index + 1)
     const lastUser = await prisma.user.findFirst({
       where: { walletIndex: { not: null } },
       orderBy: { walletIndex: 'desc' },
       select: { walletIndex: true },
     });
-    const nextIndex = (lastUser?.walletIndex ?? -1) + 1;
+    let nextIndex = (lastUser?.walletIndex ?? -1) + 1;
 
-    const { address } = this.deriveWallet(nextIndex);
+    // Derive address, skipping any index that collides with the hot wallet
+    let address = '';
+    for (let attempts = 0; attempts < 20; attempts++) {
+      const derived = this.deriveWallet(nextIndex);
+      if (derived.address.toLowerCase() !== hotWalletLower) {
+        address = derived.address;
+        break;
+      }
+      logger.warn(`HD index ${nextIndex} collides with hot wallet address — skipping`);
+      nextIndex++;
+    }
+
+    if (!address) throw new Error('Could not derive a non-conflicting deposit address');
 
     await prisma.user.update({
       where: { id: userId },

@@ -1219,6 +1219,30 @@ router.post(
   })
 );
 
+// Reset a user's personal deposit address (re-derives a fresh one)
+// Use when the assigned address conflicts with the hot wallet or needs rotation
+router.post(
+  '/users/:userId/reset-deposit-address',
+  requireRole('SUPER_ADMIN'),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { userId } = req.params;
+
+    // Clear current assignment so getOrCreateUserDepositAddress assigns a new one
+    await prisma.user.update({
+      where: { id: userId },
+      data: { depositAddress: null, walletIndex: null },
+    });
+
+    const newAddress = await tronService.getOrCreateUserDepositAddress(userId);
+
+    res.json({
+      success: true,
+      message: 'Deposit address reset successfully',
+      data: { userId, newDepositAddress: newAddress },
+    });
+  })
+);
+
 // Credit user balance manually (for missed deposits)
 router.post(
   '/users/:userId/credit-deposit',
