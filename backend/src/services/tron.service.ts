@@ -1199,33 +1199,41 @@ class TronService {
 
     const tronWeb = this.getTronWeb();
 
-    // Check free bandwidth first — each address gets 600 free bandwidth/day.
-    // A TRC-20 USDT transfer costs ~350 bandwidth, so we only send TRX when
-    // both free bandwidth AND TRX balance are insufficient.
-    let needsTrx = false;
+    // TRC-20 USDT transfers require Energy (smart contract execution).
+    // Without staked energy the network burns TRX from the sender (~14,895 energy ≈ 14 TRX at current rates).
+    // Check available energy; if insufficient, send enough TRX to cover the burn.
+    const TRX_FOR_ENERGY = 15; // conservative: covers 1 USDT transfer with no staked energy
+    let trxNeeded = 0;
     try {
-      const accountResources = await tronWeb.trx.getAccountResources(user.depositAddress);
-      const freeBandwidth = (accountResources.freeNetLimit || 600) - (accountResources.freeNetUsed || 0);
-      const stakedBandwidth = (accountResources.NetLimit || 0) - (accountResources.NetUsed || 0);
-      const availableBandwidth = freeBandwidth + stakedBandwidth;
-      if (availableBandwidth < 350) {
-        const trxBalance = (await tronWeb.trx.getBalance(user.depositAddress)) / 1_000_000;
-        needsTrx = trxBalance < 1;
-      }
-      logger.info(`Deposit address ${user.depositAddress}: bandwidth=${availableBandwidth}, needsTrx=${needsTrx}`);
-    } catch {
-      // If we can't check, fall back to sending TRX to be safe
+      const resources = await tronWeb.trx.getAccountResources(user.depositAddress);
+      const availableEnergy = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0);
       const trxBalance = (await tronWeb.trx.getBalance(user.depositAddress)) / 1_000_000;
-      needsTrx = trxBalance < 1;
+
+      if (availableEnergy < 14_895) {
+        // No staked energy — address will burn TRX for fees
+        if (trxBalance < TRX_FOR_ENERGY) {
+          trxNeeded = TRX_FOR_ENERGY - trxBalance;
+        }
+      }
+      logger.info(`Deposit address ${user.depositAddress}: energy=${availableEnergy}, trxBalance=${trxBalance}, trxNeeded=${trxNeeded}`);
+    } catch {
+      // Can't check resources — send TRX to be safe
+      const trxBalance = (await tronWeb.trx.getBalance(user.depositAddress)) / 1_000_000;
+      if (trxBalance < TRX_FOR_ENERGY) trxNeeded = TRX_FOR_ENERGY - trxBalance;
     }
 
-    if (needsTrx) {
-      logger.info(`Sending 2 TRX to deposit address ${user.depositAddress} for bandwidth`);
+    if (trxNeeded > 0) {
+      // Verify hot wallet has enough TRX before attempting top-up
+      const hotTrx = (await tronWeb.trx.getBalance(this.getHotWalletAddress())) / 1_000_000;
+      if (hotTrx < trxNeeded + 1) {
+        return { success: false, error: `Hot wallet only has ${hotTrx.toFixed(2)} TRX — need ${trxNeeded + 1} TRX to fund sweep. Please top up hot wallet.` };
+      }
+      logger.info(`Sending ${trxNeeded} TRX to deposit address ${user.depositAddress} for energy`);
       try {
-        await tronWeb.trx.sendTransaction(user.depositAddress, 2_000_000); // 2 TRX (enough for ~6 transfers)
-        await new Promise(resolve => setTimeout(resolve, 4000));
+        await tronWeb.trx.sendTransaction(user.depositAddress, Math.floor(trxNeeded * 1_000_000));
+        await new Promise(resolve => setTimeout(resolve, 5000)); // wait for confirmation
       } catch (err: any) {
-        logger.warn(`Could not send TRX for bandwidth: ${err.message}`);
+        logger.warn(`Could not send TRX for energy: ${err.message}`);
       }
     }
 
