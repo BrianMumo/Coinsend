@@ -266,13 +266,16 @@ router.post(
 router.get(
   '/usdt',
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const balance = await balanceService.getOrCreateBalance(req.user!.userId);
+    const [balance, depositAddress] = await Promise.all([
+      balanceService.getOrCreateBalance(req.user!.userId),
+      balanceService.getUserDepositAddress(req.user!.userId),
+    ]);
 
     res.json({
       success: true,
       data: {
         usdtBalance: balance.usdtBalance.toString(),
-        depositAddress: balanceService.getUsdtDepositAddress(),
+        depositAddress,
         network: 'TRON (TRC-20)',
       },
     });
@@ -393,7 +396,7 @@ router.get(
         expectedAmount: intent.expectedAmount,
         estimatedKes: intent.kesAmount,
         exchangeRate: intent.exchangeRate,
-        depositAddress: tronService.getHotWalletAddress(),
+        depositAddress: await tronService.getOrCreateUserDepositAddress(req.user!.userId),
         network: 'TRON (TRC-20)',
         expiresAt: intent.expiresAt,
         createdAt: intent.createdAt,

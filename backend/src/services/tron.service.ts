@@ -87,6 +87,70 @@ class TronService {
   }
 
   /**
+   * Derive a wallet at a specific HD index from the master mnemonic.
+   * Uses BIP44 path: m/44'/195'/0'/0/{index}  (195 = TRON coin type)
+   * Requires TRON_MNEMONIC env var.
+   */
+  deriveWallet(index: number): { address: string; privateKey: string } {
+    if (!config.tron.mnemonic) {
+      throw new Error('TRON_MNEMONIC is not configured. Add it to enable per-user deposit wallets.');
+    }
+    const path = `m/44'/195'/0'/0/${index}`;
+    try {
+      // TronWeb 6.x static method – returns a TronWeb instance configured with the derived key
+      const hdTronWeb = TronWeb.fromMnemonic(config.tron.mnemonic, path);
+      const address: string = hdTronWeb.defaultAddress?.base58 ?? hdTronWeb.address?.base58;
+      const privateKey: string = hdTronWeb.defaultPrivateKey ?? hdTronWeb.privateKey;
+      if (!address || !privateKey) {
+        throw new Error('fromMnemonic returned unexpected result');
+      }
+      return { address, privateKey };
+    } catch (error: any) {
+      throw new Error(`HD wallet derivation failed at path ${path}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get or assign a personal TRC-20 deposit address for a user.
+   * Falls back to the hot wallet if TRON_MNEMONIC is not configured.
+   */
+  async getOrCreateUserDepositAddress(userId: string): Promise<string> {
+    // Return existing address if already assigned
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { depositAddress: true, walletIndex: true },
+    });
+
+    if (user?.depositAddress) {
+      return user.depositAddress;
+    }
+
+    // If mnemonic is not configured, fall back to shared hot wallet
+    if (!config.tron.mnemonic) {
+      logger.warn('TRON_MNEMONIC not set – returning shared hot wallet as deposit address');
+      return this.getHotWalletAddress();
+    }
+
+    // Find the next available index (max assigned index + 1)
+    const lastUser = await prisma.user.findFirst({
+      where: { walletIndex: { not: null } },
+      orderBy: { walletIndex: 'desc' },
+      select: { walletIndex: true },
+    });
+    const nextIndex = (lastUser?.walletIndex ?? -1) + 1;
+
+    const { address } = this.deriveWallet(nextIndex);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { depositAddress: address, walletIndex: nextIndex },
+    });
+
+    logger.info(`Assigned deposit address ${address} (index ${nextIndex}) to user ${userId}`);
+    return address;
+  }
+
+  /**
    * Get TRX balance of the hot wallet
    */
   async getTrxBalance(): Promise<number> {
@@ -196,46 +260,121 @@ class TronService {
   }
 
   /**
-   * Check for new incoming USDT deposits
+   * Credit USDT directly to a user whose personal deposit address received funds.
+   * Called automatically by the deposit monitor.
+   */
+  private async creditUserDeposit(
+    userId: string,
+    txHash: string,
+    fromAddress: string,
+    amount: number
+  ): Promise<void> {
+    const rate = await prisma.exchangeRate.findFirst({
+      where: { pair: 'USDT_KES', isActive: true },
+    });
+    const exchangeRate = rate ? Number(rate.buyRate) : 0;
+    const kesAmount = amount * exchangeRate;
+
+    await prisma.$transaction(async (tx) => {
+      let userBalance = await tx.userBalance.findUnique({ where: { userId } });
+      if (!userBalance) {
+        userBalance = await tx.userBalance.create({
+          data: { userId, balance: 0, usdtBalance: 0, currency: 'KES' },
+        });
+      }
+
+      const currentUsdt = Number(userBalance.usdtBalance);
+      const newUsdt = currentUsdt + amount;
+
+      await tx.userBalance.update({
+        where: { userId },
+        data: { usdtBalance: newUsdt },
+      });
+
+      await tx.balanceTransaction.create({
+        data: {
+          userBalanceId: userBalance.id,
+          type: 'USDT_DEPOSIT',
+          status: 'COMPLETED',
+          currency: 'USDT',
+          amount,
+          usdtAmount: amount,
+          balanceBefore: currentUsdt,
+          balanceAfter: newUsdt,
+          txHash,
+          walletAddress: fromAddress,
+          reference: txHash,
+          description: `USDT deposit: ${amount} USDT (≈ KES ${kesAmount.toFixed(2)} @ ${exchangeRate})`,
+          completedAt: new Date(),
+        },
+      });
+
+      await tx.cryptoTransaction.update({
+        where: { txHash },
+        data: { status: 'COMPLETED' },
+      });
+
+      // Mark any matching pending intent as matched
+      await tx.pendingUsdtDeposit.updateMany({
+        where: {
+          userId,
+          status: 'PENDING',
+          expiresAt: { gt: new Date() },
+          expectedAmount: { gte: amount - 0.01, lte: amount + 0.01 },
+        },
+        data: { status: 'MATCHED', matchedTxHash: txHash, matchedAmount: amount, matchedAt: new Date() },
+      });
+    });
+
+    logger.info(`Credited ${amount} USDT to user ${userId} from personal deposit address (tx: ${txHash})`);
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const userBalance = await prisma.userBalance.findUnique({ where: { userId } });
+    if (user) {
+      telegramService.notifyDeposit({
+        email: user.email,
+        usdtAmount: amount,
+        txHash,
+        newBalance: Number(userBalance?.usdtBalance || 0),
+      }).catch(console.error);
+    }
+  }
+
+  /**
+   * Check for new incoming USDT deposits.
+   * Monitors both the shared hot wallet (legacy) and each user's personal deposit address.
    */
   async checkNewDeposits(): Promise<number> {
     const tronWeb = this.getTronWeb();
     const hotWallet = this.getHotWalletAddress();
     const hotWalletHex = tronWeb.address.toHex(hotWallet);
 
+    let totalDeposits = 0;
+
+    // ── 1. Check hot wallet (legacy / backward-compatible flow) ──────────────
     try {
-      // Get last checked timestamp
       const lastCheck = await prisma.systemConfig.findUnique({
         where: { key: 'lastTronCheckTimestamp' },
       });
-
       const sinceTimestamp = lastCheck
         ? parseInt(lastCheck.value)
-        : Date.now() - 3600000; // Default: last 1 hour
+        : Date.now() - 3600000;
 
-      // Query transfer events to our hot wallet
       const events = await tronWeb.getEventResult(this.usdtContract, {
         eventName: 'Transfer',
         sinceTimestamp,
         filters: { to: hotWalletHex },
       }) as TransferEvent[];
 
-      let newDeposits = 0;
-
       for (const event of events) {
         const txHash = event.transaction;
         const amount = Number(event.result.value) / 1_000_000;
         const fromAddress = tronWeb.address.fromHex(event.result.from);
-
-        // Check if already processed
-        const existing = await prisma.cryptoTransaction.findUnique({
-          where: { txHash },
-        });
+        const existing = await prisma.cryptoTransaction.findUnique({ where: { txHash } });
 
         if (!existing && amount > 0) {
-          logger.info(`New USDT deposit detected: ${amount} USDT from ${fromAddress}`);
+          logger.info(`New USDT deposit to hot wallet: ${amount} USDT from ${fromAddress}`);
 
-          // Store the deposit
           await prisma.cryptoTransaction.create({
             data: {
               type: 'DEPOSIT',
@@ -247,35 +386,111 @@ class TronService {
               toAddress: hotWallet,
               amount,
               blockNumber: BigInt(event.block),
-              confirmations: 19, // TRON is fast, assume confirmed
+              confirmations: 19,
               confirmedAt: new Date(event.timestamp),
               notes: `Deposit of ${amount} USDT from ${fromAddress}`,
             },
           });
 
-          // Try to match with a pending order
           await this.matchDepositToOrder(txHash, fromAddress, amount);
-
-          newDeposits++;
+          totalDeposits++;
         }
       }
 
-      // Update last checked timestamp
       await prisma.systemConfig.upsert({
         where: { key: 'lastTronCheckTimestamp' },
         update: { value: Date.now().toString() },
         create: { key: 'lastTronCheckTimestamp', value: Date.now().toString() },
       });
-
-      if (newDeposits > 0) {
-        logger.info(`Processed ${newDeposits} new USDT deposits`);
-      }
-
-      return newDeposits;
     } catch (error: any) {
-      logger.error('Failed to check TRON deposits:', error.message);
-      return 0;
+      logger.error('Failed to check hot wallet deposits:', error.message);
     }
+
+    // ── 2. Check each user's personal deposit address ─────────────────────────
+    try {
+      const usersWithAddresses = await prisma.user.findMany({
+        where: { depositAddress: { not: null }, isActive: true },
+        select: { id: true, depositAddress: true },
+      });
+
+      for (const user of usersWithAddresses) {
+        if (!user.depositAddress) continue;
+        try {
+          const deposits = await this.checkUserAddress(user.depositAddress, user.id);
+          totalDeposits += deposits;
+        } catch (err: any) {
+          logger.error(`Failed to check address for user ${user.id}: ${err.message}`);
+        }
+      }
+    } catch (error: any) {
+      logger.error('Failed to enumerate user deposit addresses:', error.message);
+    }
+
+    if (totalDeposits > 0) {
+      logger.info(`Processed ${totalDeposits} new USDT deposits total`);
+    }
+
+    return totalDeposits;
+  }
+
+  /**
+   * Check a single user deposit address for new incoming USDT transfers.
+   */
+  private async checkUserAddress(address: string, userId: string): Promise<number> {
+    const tronWeb = this.getTronWeb();
+    const addressHex = tronWeb.address.toHex(address);
+    const configKey = `lastCheck_${address}`;
+
+    const lastCheck = await prisma.systemConfig.findUnique({ where: { key: configKey } });
+    const sinceTimestamp = lastCheck
+      ? parseInt(lastCheck.value)
+      : Date.now() - 86400000; // default: last 24 hours
+
+    const events = await tronWeb.getEventResult(this.usdtContract, {
+      eventName: 'Transfer',
+      sinceTimestamp,
+      filters: { to: addressHex },
+    }) as TransferEvent[];
+
+    await prisma.systemConfig.upsert({
+      where: { key: configKey },
+      update: { value: Date.now().toString() },
+      create: { key: configKey, value: Date.now().toString() },
+    });
+
+    let newDeposits = 0;
+    for (const event of events) {
+      const txHash = event.transaction;
+      const amount = Number(event.result.value) / 1_000_000;
+      const fromAddress = tronWeb.address.fromHex(event.result.from);
+      const existing = await prisma.cryptoTransaction.findUnique({ where: { txHash } });
+
+      if (!existing && amount > 0) {
+        logger.info(`New USDT deposit at user address ${address}: ${amount} USDT from ${fromAddress}`);
+
+        await prisma.cryptoTransaction.create({
+          data: {
+            type: 'DEPOSIT',
+            status: 'CONFIRMED',
+            currency: 'USDT',
+            network: 'TRON',
+            txHash,
+            fromAddress,
+            toAddress: address,
+            amount,
+            blockNumber: BigInt(event.block),
+            confirmations: 19,
+            confirmedAt: new Date(event.timestamp),
+            notes: `Deposit to user personal wallet from ${fromAddress}`,
+          },
+        });
+
+        await this.creditUserDeposit(userId, txHash, fromAddress, amount);
+        newDeposits++;
+      }
+    }
+
+    return newDeposits;
   }
 
   /**
@@ -513,11 +728,14 @@ class TronService {
 
     logger.info(`Created deposit intent for user ${userId}: ${uniqueAmount} USDT (unique amount), expected KES ${estimatedKes.toFixed(2)}`);
 
+    // Return user's personal deposit address (or hot wallet if mnemonic not configured)
+    const depositAddress = await this.getOrCreateUserDepositAddress(userId);
+
     return {
       id: intent.id,
       expectedAmount: uniqueAmount,
       expiresAt,
-      depositAddress: this.getHotWalletAddress(),
+      depositAddress,
       exchangeRate,
       estimatedKes,
     };
@@ -662,9 +880,17 @@ class TronService {
         return { success: false, error: 'Could not parse USDT transfer from transaction' };
       }
 
-      // 6. Verify the transfer was TO our hot wallet
-      if (toAddress.toLowerCase() !== hotWallet.toLowerCase()) {
-        return { success: false, error: `This transaction was not sent to our deposit address. Expected: ${hotWallet}, Got: ${toAddress}` };
+      // 6. Verify the transfer was TO either the hot wallet OR the user's personal deposit address
+      const userRecord = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { depositAddress: true },
+      });
+      const validAddresses = [hotWallet.toLowerCase()];
+      if (userRecord?.depositAddress) {
+        validAddresses.push(userRecord.depositAddress.toLowerCase());
+      }
+      if (!validAddresses.includes(toAddress.toLowerCase())) {
+        return { success: false, error: `This transaction was not sent to your deposit address` };
       }
 
       // 7. Verify it's the USDT contract (using contract address from log)
@@ -745,7 +971,7 @@ class TronService {
             network: 'TRON',
             txHash,
             fromAddress,
-            toAddress: hotWallet,
+            toAddress,
             amount: transferAmount,
             blockNumber: BigInt(txInfo.blockNumber),
             confirmations: 19,
@@ -885,6 +1111,89 @@ class TronService {
     } catch (error: any) {
       logger.error('Failed to get wallet summary:', error.message);
       throw error;
+    }
+  }
+
+  /**
+   * Sweep USDT from a user's personal deposit address to the hot wallet.
+   * Requires TRON_MNEMONIC to derive the user's private key.
+   * NOTE: The user's deposit address needs TRX for bandwidth. If balance is low,
+   * a small amount of TRX will be sent first automatically.
+   */
+  async sweepUserDeposit(userId: string): Promise<{ success: boolean; txHash?: string; sweptAmount?: number; error?: string }> {
+    if (!config.tron.mnemonic) {
+      return { success: false, error: 'TRON_MNEMONIC not configured' };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { depositAddress: true, walletIndex: true },
+    });
+
+    if (!user?.depositAddress || user.walletIndex === null || user.walletIndex === undefined) {
+      return { success: false, error: 'User does not have a personal deposit address' };
+    }
+
+    const usdtBalance = await this.getUsdtBalanceOf(user.depositAddress);
+    if (usdtBalance < 0.1) {
+      return { success: false, error: `Nothing to sweep: ${usdtBalance} USDT at deposit address` };
+    }
+
+    const tronWeb = this.getTronWeb();
+
+    // Check TRX balance for bandwidth; top up if needed
+    const trxBalance = (await tronWeb.trx.getBalance(user.depositAddress)) / 1_000_000;
+    if (trxBalance < 1) {
+      logger.info(`Sending TRX to user deposit address ${user.depositAddress} for bandwidth`);
+      try {
+        await tronWeb.trx.sendTransaction(user.depositAddress, 5_000_000); // 5 TRX
+        await new Promise(resolve => setTimeout(resolve, 4000)); // wait ~4s
+      } catch (err: any) {
+        logger.warn(`Could not send TRX for bandwidth: ${err.message}`);
+      }
+    }
+
+    // Derive the private key for this user's wallet index
+    const { privateKey } = this.deriveWallet(user.walletIndex);
+
+    const fullHost = config.tron.network === 'mainnet'
+      ? 'https://api.trongrid.io'
+      : 'https://api.shasta.trongrid.io';
+
+    const sweepTronWeb = new TronWeb({
+      fullHost,
+      headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
+      privateKey,
+    });
+
+    const hotWallet = this.getHotWalletAddress();
+    const amountInSun = Math.floor(usdtBalance * 1_000_000);
+
+    try {
+      const contract = await sweepTronWeb.contract().at(this.usdtContract);
+      const tx = await contract.transfer(hotWallet, amountInSun).send({ feeLimit: 50_000_000 });
+      const txHash = typeof tx === 'string' ? tx : tx.txid || tx.transaction?.txID;
+
+      logger.info(`Swept ${usdtBalance} USDT from user ${userId} deposit address to hot wallet. TX: ${txHash}`);
+
+      await prisma.cryptoTransaction.create({
+        data: {
+          type: 'DEPOSIT',
+          status: 'PENDING',
+          currency: 'USDT',
+          network: 'TRON',
+          txHash,
+          fromAddress: user.depositAddress,
+          toAddress: hotWallet,
+          amount: usdtBalance,
+          notes: `Sweep from user ${userId} personal deposit address`,
+        },
+      });
+
+      return { success: true, txHash, sweptAmount: usdtBalance };
+    } catch (error: any) {
+      logger.error(`Failed to sweep user ${userId} deposit address: ${error.message}`);
+      return { success: false, error: error.message };
     }
   }
 }

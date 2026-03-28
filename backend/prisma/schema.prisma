@@ -90,18 +90,20 @@ enum BalanceTransactionStatus {
 // ============ MODELS ============
 
 model User {
-  id            String     @id @default(uuid())
-  email         String     @unique
-  phone         String?    @unique
-  passwordHash  String
-  firstName     String?
-  lastName      String?
-  country       String     @default("KE")
-  kycStatus     KycStatus  @default(UNVERIFIED)
-  isActive      Boolean    @default(true)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  lastLoginAt   DateTime?
+  id                 String     @id @default(uuid())
+  email              String     @unique
+  phone              String?    @unique
+  passwordHash       String
+  firstName          String?
+  lastName           String?
+  country            String     @default("KE")
+  kycStatus          KycStatus  @default(UNVERIFIED)
+  isActive           Boolean    @default(true)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  lastLoginAt        DateTime?
+  depositAddress     String?    @unique  // Personal TRC-20 deposit address (HD wallet)
+  walletIndex        Int?       @unique  // HD wallet derivation index (m/44'/195'/0'/0/{index})
 
   orders              Order[]
   balance             UserBalance?
@@ -110,6 +112,7 @@ model User {
   @@index([email])
   @@index([phone])
   @@index([kycStatus])
+  @@index([depositAddress])
 }
 
 model Admin {

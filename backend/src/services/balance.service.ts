@@ -651,10 +651,11 @@ class BalanceService {
   // ============ USDT BALANCE METHODS ============
 
   /**
-   * Get the deposit address for USDT (shared hot wallet)
+   * Get (or create) the personal TRC-20 deposit address for a specific user.
+   * Falls back to the shared hot wallet if TRON_MNEMONIC is not configured.
    */
-  getUsdtDepositAddress(): string {
-    return tronService.getHotWalletAddress();
+  async getUserDepositAddress(userId: string): Promise<string> {
+    return tronService.getOrCreateUserDepositAddress(userId);
   }
 
   /**

@@ -1208,6 +1208,17 @@ router.post(
   })
 );
 
+// Sweep USDT from a user's personal deposit address to hot wallet
+router.post(
+  '/users/:userId/sweep-deposit',
+  requireRole('SUPER_ADMIN'),
+  asyncHandler(async (req: AdminRequest, res: Response) => {
+    const { userId } = req.params;
+    const result = await tronService.sweepUserDeposit(userId);
+    res.json({ success: result.success, data: result });
+  })
+);
+
 // Credit user balance manually (for missed deposits)
 router.post(
   '/users/:userId/credit-deposit',
