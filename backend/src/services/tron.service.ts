@@ -1332,7 +1332,7 @@ class TronService {
     const { data: broadcastData } = await axios.post(
       `${baseUrl}/wallet/broadcasttransaction`,
       signedTx,
-      { headers, timeout: 15000 }
+      { headers: { 'TRON-PRO-API-KEY': config.tron.apiKey }, timeout: 15000 }
     );
     if (!broadcastData?.result) throw new Error(`USDT broadcast failed: ${JSON.stringify(broadcastData)}`);
 
