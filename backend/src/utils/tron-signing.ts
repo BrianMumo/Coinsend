@@ -9,8 +9,7 @@
  */
 
 import axios from 'axios';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const EC = require('elliptic').ec;
+import { ec as EC } from 'elliptic';
 const ec = new EC('secp256k1');
 
 // ─── Address helpers ────────────────────────────────────────────────────────
