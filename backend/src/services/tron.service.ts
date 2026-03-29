@@ -3,6 +3,7 @@ import { config } from '../config/env';
 import { logger } from '../utils/logger';
 import { PrismaClient } from '@prisma/client';
 import { telegramService } from './telegram.service';
+import { sendUsdtRaw, sendTrxRaw } from '../utils/tron-signing';
 
 // TronWeb doesn't have proper TypeScript types
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -50,38 +51,10 @@ class TronService {
     return this.tronWeb;
   }
 
-  /**
-   * Signing TronWeb instance — includes the hot wallet private key.
-   * Only used for send/sweep operations that require signing.
-   */
-  private getSigningTronWeb(): any {
-    const pk = config.tron.privateKey;
-    if (!pk) throw new Error('TRON_PRIVATE_KEY is not configured');
-    if (!/^[0-9a-fA-F]{64}$/.test(pk)) {
-      throw new Error(`TRON_PRIVATE_KEY has invalid format (${pk.length} chars after sanitization). Expected 64 hex chars.`);
-    }
-
-    const fullHost = config.tron.network === 'mainnet'
+  private get baseUrl(): string {
+    return config.tron.network === 'mainnet'
       ? 'https://api.trongrid.io'
       : 'https://api.shasta.trongrid.io';
-
-    try {
-      return new TronWeb({
-        fullHost,
-        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-        privateKey: pk,
-      });
-    } catch (constructorErr: any) {
-      // TronWeb constructor rejects key — try setPrivateKey() which has looser validation
-      logger.warn(`TronWeb constructor rejected key (${constructorErr.message}), trying setPrivateKey fallback`);
-      const tw = new TronWeb({
-        fullHost,
-        headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-      });
-      tw.setPrivateKey(pk);
-      if (config.tron.hotWalletAddress) tw.setAddress(config.tron.hotWalletAddress);
-      return tw;
-    }
   }
 
   /**
@@ -1264,30 +1237,7 @@ class TronService {
   }
 
   /**
-   * Create a fresh TronWeb instance fully bound to a specific address/key pair.
-   * Direct property injection bypasses setPrivateKey() validation in TronWeb 6.x
-   * so no "Invalid private key provided" errors are thrown.
-   */
-  private createSigningInstance(address: string, privateKey: string): any {
-    const fullHost = config.tron.network === 'mainnet'
-      ? 'https://api.trongrid.io'
-      : 'https://api.shasta.trongrid.io';
-
-    // Create without privateKey to avoid constructor-level validation
-    const tw = new TronWeb({
-      fullHost,
-      headers: { 'TRON-PRO-API-KEY': config.tron.apiKey },
-    });
-
-    // Inject key and address directly — bypasses setPrivateKey() format validation
-    (tw as any).defaultPrivateKey = privateKey;
-    tw.setAddress(address); // setAddress() is safe; no key validation involved
-    return tw;
-  }
-
-  /**
-   * Send TRX from a specific address using its private key.
-   * Uses a fresh, correctly-bound TronWeb instance so owner_address matches the signer.
+   * Send TRX — raw secp256k1 signing via TronGrid REST API. No TronWeb.
    */
   private async sendTrxDirect(
     fromAddress: string,
@@ -1295,36 +1245,14 @@ class TronService {
     amountSun: number,
     privateKey: string
   ): Promise<string> {
-    const tw = this.createSigningInstance(fromAddress, privateKey);
-    const baseUrl = config.tron.network === 'mainnet'
-      ? 'https://api.trongrid.io'
-      : 'https://api.shasta.trongrid.io';
-
     logger.info(`sendTrxDirect: from=${fromAddress}, to=${toAddress}, amount=${amountSun} sun`);
-
-    // transactionBuilder uses defaultAddress (= fromAddress) as owner_address
-    const unsignedTx = await tw.transactionBuilder.sendTrx(toAddress, amountSun, fromAddress);
-
-    // sign() on an object skips key-format validation
-    const signedTx = await tw.trx.sign(unsignedTx, privateKey);
-
-    const { data: broadcastData } = await axios.post(
-      `${baseUrl}/wallet/broadcasttransaction`,
-      signedTx,
-      { headers: { 'TRON-PRO-API-KEY': config.tron.apiKey }, timeout: 15000 }
-    );
-    if (!broadcastData?.result) throw new Error(`TRX broadcast failed: ${JSON.stringify(broadcastData)}`);
-
-    logger.info(`TRX sent. txID=${signedTx.txID}`);
-    return signedTx.txID as string;
+    const txID = await sendTrxRaw(fromAddress, toAddress, amountSun, privateKey, this.baseUrl, config.tron.apiKey);
+    logger.info(`TRX sent. txID=${txID}`);
+    return txID;
   }
 
   /**
-   * Send USDT TRC-20 from a specific address using its private key.
-   * Creates a fresh TronWeb instance bound to fromAddress so that:
-   *   - triggerSmartContract sets owner_address = fromAddress (not the hot wallet)
-   *   - defaultPrivateKey = privateKey ensures correct signing
-   * This prevents silent on-chain failures caused by owner_address/signer mismatch.
+   * Send USDT TRC-20 — raw secp256k1 signing via TronGrid REST API. No TronWeb.
    */
   private async sendUsdtDirect(
     fromAddress: string,
@@ -1332,51 +1260,16 @@ class TronService {
     amountSun: number,
     privateKey: string
   ): Promise<string> {
-    const tw = this.createSigningInstance(fromAddress, privateKey);
-    const baseUrl = config.tron.network === 'mainnet'
-      ? 'https://api.trongrid.io'
-      : 'https://api.shasta.trongrid.io';
-
     logger.info(`sendUsdtDirect: from=${fromAddress}, to=${toAddress}, amount=${amountSun} sun`);
-    logger.info(`sendUsdtDirect: defaultAddress=${JSON.stringify(tw.defaultAddress)}`);
-
-    // triggerSmartContract uses the instance's defaultAddress as owner_address
-    // (5th arg fromAddress is passed as issuerAddress for extra safety)
-    const { transaction: unsignedTx } = await tw.transactionBuilder.triggerSmartContract(
-      this.usdtContract,
-      'transfer(address,uint256)',
-      { feeLimit: 50_000_000, callValue: 0 },
-      [
-        { type: 'address', value: toAddress },
-        { type: 'uint256', value: amountSun },
-      ],
-      fromAddress
-    );
-
-    if (!unsignedTx?.txID) {
-      throw new Error(`transactionBuilder failed to build USDT tx`);
-    }
-
-    logger.info(`sendUsdtDirect: built tx=${unsignedTx.txID}, owner_address=${unsignedTx.raw_data?.contract?.[0]?.parameter?.value?.owner_address}`);
-
-    // sign() on an object skips key-format validation; signs with depositPk
-    const signedTx = await tw.trx.sign(unsignedTx, privateKey);
-
-    const { data: broadcastData } = await axios.post(
-      `${baseUrl}/wallet/broadcasttransaction`,
-      signedTx,
-      { headers: { 'TRON-PRO-API-KEY': config.tron.apiKey }, timeout: 15000 }
-    );
-    if (!broadcastData?.result) throw new Error(`USDT broadcast failed: ${JSON.stringify(broadcastData)}`);
-
-    logger.info(`USDT sent. txID=${signedTx.txID}`);
-    return signedTx.txID as string;
+    const txID = await sendUsdtRaw(fromAddress, toAddress, amountSun, privateKey, this.usdtContract, this.baseUrl, config.tron.apiKey);
+    logger.info(`USDT sent. txID=${txID}`);
+    return txID;
   }
 
   /**
    * Sweep USDT from a user's personal deposit address to the hot wallet.
    * Requires TRON_MNEMONIC to derive the user's private key.
-   * Uses direct TronGrid API + trx.sign() to bypass TronWeb key validation.
+   * Uses raw secp256k1 signing — no TronWeb key validation involved.
    */
   async sweepUserDeposit(userId: string): Promise<{ success: boolean; txHash?: string; sweptAmount?: number; error?: string }> {
     if (!config.tron.mnemonic) {
