@@ -201,7 +201,7 @@ export interface DashboardStats {
 }
 
 // M-Pesa types
-export type MpesaTransactionType = 'C2B_STK_PUSH' | 'B2C_PAYMENT' | 'BALANCE_QUERY' | 'REVERSAL';
+export type MpesaTransactionType = 'C2B_STK_PUSH' | 'C2B_PAYBILL' | 'B2C_PAYMENT' | 'BALANCE_QUERY' | 'REVERSAL';
 export type MpesaTransactionStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'TIMEOUT';
 
 export interface MpesaTransaction {

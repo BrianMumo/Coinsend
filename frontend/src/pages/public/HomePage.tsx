@@ -9,7 +9,6 @@ import {
   Zap,
   Wallet,
   MessageCircle,
-  Smartphone,
   BadgeCheck,
   Globe,
   Users,
@@ -21,7 +20,6 @@ import {
   CheckCircle2,
   ArrowLeftRight,
   Landmark,
-  Send,
 } from 'lucide-react';
 
 const WHATSAPP_NUMBER = '+254768294351';

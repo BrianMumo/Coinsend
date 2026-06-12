@@ -1,7 +1,7 @@
 import { HTMLAttributes } from 'react';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  variant?: 'default' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'success' | 'warning' | 'error';
 }
 
 const variantClasses: Record<string, string> = {
@@ -11,6 +11,10 @@ const variantClasses: Record<string, string> = {
   completed:  'bg-accent-500/10 text-accent-400 border-accent-500/20',
   failed:     'bg-red-500/10 text-red-400 border-red-500/20',
   cancelled:  'bg-surface-600/20 text-surface-400 border-surface-600/30',
+  // Aliases for semantic variants used across admin pages
+  success:    'bg-accent-500/10 text-accent-400 border-accent-500/20',
+  warning:    'bg-gold-400/10 text-gold-400 border-gold-400/20',
+  error:      'bg-red-500/10 text-red-400 border-red-500/20',
 };
 
 export const Badge = ({
