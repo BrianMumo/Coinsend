@@ -1,53 +1,40 @@
-import { HTMLAttributes, forwardRef } from 'react';
-import { clsx } from 'clsx';
+import { HTMLAttributes } from 'react';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'pending' | 'paid' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'success' | 'warning' | 'error';
+  variant?: 'default' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
 }
 
-const variants = {
-  default: 'bg-gray-100 text-gray-800',
-  pending: 'bg-yellow-100 text-yellow-800',
-  paid: 'bg-blue-100 text-blue-800',
-  processing: 'bg-purple-100 text-purple-800',
-  completed: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
-  cancelled: 'bg-gray-100 text-gray-600',
-  success: 'bg-green-100 text-green-800',
-  warning: 'bg-yellow-100 text-yellow-800',
-  error: 'bg-red-100 text-red-800',
+const variantClasses: Record<string, string> = {
+  default:    'bg-surface-700/40 text-surface-300 border-surface-600/30',
+  pending:    'bg-gold-400/10 text-gold-400 border-gold-400/20',
+  processing: 'bg-lavender-500/10 text-lavender-400 border-lavender-500/20',
+  completed:  'bg-accent-500/10 text-accent-400 border-accent-500/20',
+  failed:     'bg-red-500/10 text-red-400 border-red-500/20',
+  cancelled:  'bg-surface-600/20 text-surface-400 border-surface-600/30',
 };
 
-export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
-  ({ className, variant = 'default', children, ...props }, ref) => {
-    return (
-      <span
-        ref={ref}
-        className={clsx(
-          'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-          variants[variant],
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </span>
-    );
-  }
+export const Badge = ({
+  variant = 'default',
+  className = '',
+  ...props
+}: BadgeProps) => (
+  <span
+    className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border ${variantClasses[variant]} ${className}`}
+    {...props}
+  />
 );
 
-Badge.displayName = 'Badge';
-
-// Helper function to get badge variant from order status
 export const getStatusVariant = (status: string): BadgeProps['variant'] => {
-  const statusMap: Record<string, BadgeProps['variant']> = {
-    PENDING: 'pending',
-    PAID: 'paid',
+  const map: Record<string, BadgeProps['variant']> = {
+    PENDING:    'pending',
     PROCESSING: 'processing',
-    COMPLETED: 'completed',
-    FAILED: 'failed',
-    CANCELLED: 'cancelled',
-    EXPIRED: 'cancelled',
+    COMPLETED:  'completed',
+    FAILED:     'failed',
+    CANCELLED:  'cancelled',
+    ACTIVE:     'completed',
+    INACTIVE:   'cancelled',
+    VERIFIED:   'completed',
+    UNVERIFIED: 'pending',
   };
-  return statusMap[status] || 'default';
+  return map[status] || 'default';
 };

@@ -68,12 +68,12 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-dark-900 mesh-bg">
       <PageTitle title="Create Account" description="Sign up for Coinsend to start trading crypto and sending money across borders." />
       <Header />
 
       <div className="flex items-center justify-center py-12 px-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md animate-fade-in">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Create Account</CardTitle>
             <CardDescription>Get started with Coinsend today</CardDescription>
@@ -139,13 +139,13 @@ const RegisterPage = () => {
               </Button>
             </form>
 
-            <p className="mt-4 text-xs text-gray-500 text-center">
+            <p className="mt-4 text-xs text-surface-500 text-center">
               By creating an account, you agree to our Terms of Service and Privacy Policy.
             </p>
 
-            <div className="mt-6 text-center text-sm text-gray-600">
+            <div className="mt-6 text-center text-sm text-surface-400">
               Already have an account?{' '}
-              <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
+              <Link to="/login" className="text-gold-400 hover:text-gold-300 font-medium transition-colors">
                 Sign in
               </Link>
             </div>

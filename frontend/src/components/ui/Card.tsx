@@ -1,67 +1,52 @@
 import { HTMLAttributes, forwardRef } from 'react';
-import { clsx } from 'clsx';
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'bordered';
+  variant?: 'default' | 'glass' | 'elevated';
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant = 'default', children, ...props }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={clsx(
-          'bg-white rounded-xl p-6',
-          variant === 'default' && 'shadow-sm border border-gray-200',
-          variant === 'bordered' && 'border-2 border-gray-200',
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    );
+  ({ className = '', variant = 'default', ...props }, ref) => {
+    const variants = {
+      default:  'bg-dark-800/50 backdrop-blur-xl border border-surface-700/30 rounded-2xl shadow-glass',
+      glass:    'bg-dark-800/30 backdrop-blur-2xl border border-surface-700/20 rounded-2xl',
+      elevated: 'bg-dark-800/60 backdrop-blur-xl border border-surface-700/30 rounded-2xl shadow-glass-lg',
+    };
+    return <div ref={ref} className={`${variants[variant]} ${className}`} {...props} />;
   }
 );
-
 Card.displayName = 'Card';
 
 export const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, children, ...props }, ref) => (
-    <div ref={ref} className={clsx('mb-4', className)} {...props}>
-      {children}
-    </div>
+  ({ className = '', ...props }, ref) => (
+    <div ref={ref} className={`px-5 py-4 border-b border-surface-700/20 ${className}`} {...props} />
   )
 );
-
 CardHeader.displayName = 'CardHeader';
 
 export const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, children, ...props }, ref) => (
-    <h3 ref={ref} className={clsx('text-lg font-semibold text-gray-900', className)} {...props}>
-      {children}
-    </h3>
+  ({ className = '', ...props }, ref) => (
+    <h3 ref={ref} className={`text-lg font-semibold text-surface-50 ${className}`} {...props} />
   )
 );
-
 CardTitle.displayName = 'CardTitle';
 
 export const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, children, ...props }, ref) => (
-    <p ref={ref} className={clsx('text-sm text-gray-500', className)} {...props}>
-      {children}
-    </p>
+  ({ className = '', ...props }, ref) => (
+    <p ref={ref} className={`text-sm text-surface-400 mt-1 ${className}`} {...props} />
   )
 );
-
 CardDescription.displayName = 'CardDescription';
 
 export const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, children, ...props }, ref) => (
-    <div ref={ref} className={clsx('', className)} {...props}>
-      {children}
-    </div>
+  ({ className = '', ...props }, ref) => (
+    <div ref={ref} className={`p-5 ${className}`} {...props} />
   )
 );
-
 CardContent.displayName = 'CardContent';
+
+export const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  ({ className = '', ...props }, ref) => (
+    <div ref={ref} className={`px-5 py-4 border-t border-surface-700/20 ${className}`} {...props} />
+  )
+);
+CardFooter.displayName = 'CardFooter';

@@ -57,6 +57,7 @@ enum CryptoNetwork {
 
 enum MpesaTransactionType {
   C2B_STK_PUSH
+  C2B_PAYBILL
   B2C_PAYMENT
   BALANCE_QUERY
   REVERSAL

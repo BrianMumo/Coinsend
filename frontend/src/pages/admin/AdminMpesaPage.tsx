@@ -296,6 +296,7 @@ const AdminMpesaPage = () => {
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       C2B_STK_PUSH: 'STK Push',
+      C2B_PAYBILL: 'Paybill Deposit',
       B2C_PAYMENT: 'B2C',
       BALANCE_QUERY: 'Balance',
       REVERSAL: 'Reversal',
@@ -306,6 +307,7 @@ const AdminMpesaPage = () => {
   const typeOptions = [
     { value: '', label: 'All Types' },
     { value: 'C2B_STK_PUSH', label: 'STK Push' },
+    { value: 'C2B_PAYBILL', label: 'Paybill Deposit' },
     { value: 'B2C_PAYMENT', label: 'B2C Payment' },
     { value: 'BALANCE_QUERY', label: 'Balance Query' },
     { value: 'REVERSAL', label: 'Reversal' },
@@ -581,11 +583,11 @@ const AdminMpesaPage = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                      tx.transactionType === 'C2B_STK_PUSH' ? 'bg-green-100' :
+                      tx.transactionType === 'C2B_STK_PUSH' || tx.transactionType === 'C2B_PAYBILL' ? 'bg-green-100' :
                       tx.transactionType === 'B2C_PAYMENT' ? 'bg-blue-100' :
                       tx.transactionType === 'REVERSAL' ? 'bg-orange-100' : 'bg-gray-100'
                     }`}>
-                      {tx.transactionType === 'C2B_STK_PUSH' ? (
+                      {tx.transactionType === 'C2B_STK_PUSH' || tx.transactionType === 'C2B_PAYBILL' ? (
                         <ArrowDownLeft className="h-4 w-4 text-green-600" />
                       ) : tx.transactionType === 'B2C_PAYMENT' ? (
                         <ArrowUpRight className="h-4 w-4 text-blue-600" />

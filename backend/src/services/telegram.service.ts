@@ -2,7 +2,7 @@ import axios from 'axios';
 import { config } from '../config/env';
 
 interface TelegramMessage {
-  type: 'SIGNUP' | 'LOGIN' | 'DEPOSIT' | 'WITHDRAWAL' | 'WITHDRAWAL_COMPLETE' | 'WITHDRAWAL_FAILED';
+  type: 'SIGNUP' | 'LOGIN' | 'DEPOSIT' | 'MPESA_DEPOSIT' | 'WITHDRAWAL' | 'WITHDRAWAL_COMPLETE' | 'WITHDRAWAL_FAILED';
   data: Record<string, unknown>;
 }
 
@@ -56,6 +56,19 @@ class TelegramService {
 💵 Amount: $${data.usdtAmount} USDT
 🔗 TX Hash: \`${data.txHash}\`
 📊 New Balance: $${data.newBalance} USDT
+🕐 Time: ${timestamp}
+━━━━━━━━━━━━━━━`;
+
+      case 'MPESA_DEPOSIT':
+        return `
+🟢 *M-PESA PAYBILL DEPOSIT*
+━━━━━━━━━━━━━━━
+💵 Amount: KES ${data.amount}
+👤 From: ${data.payerName || 'N/A'}
+📱 Phone: ${data.phoneNumber || 'N/A'}
+🧾 Receipt: ${data.mpesaReceipt}
+🏷️ Account Ref: ${data.billRefNumber || '-'}
+💰 Paybill Balance: KES ${data.orgBalance ?? 'N/A'}
 🕐 Time: ${timestamp}
 ━━━━━━━━━━━━━━━`;
 
@@ -133,6 +146,17 @@ class TelegramService {
 
   async notifyDeposit(data: { email: string; usdtAmount: number; txHash: string; newBalance: number }) {
     await this.sendNotification({ type: 'DEPOSIT', data });
+  }
+
+  async notifyMpesaDeposit(data: {
+    amount: number;
+    payerName?: string;
+    phoneNumber?: string;
+    mpesaReceipt: string;
+    billRefNumber?: string;
+    orgBalance?: number | null;
+  }) {
+    await this.sendNotification({ type: 'MPESA_DEPOSIT', data });
   }
 
   async notifyWithdrawal(data: { email: string; usdtAmount: number; kesAmount: number; phoneNumber: string; rate: number }) {

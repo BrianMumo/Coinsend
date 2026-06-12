@@ -24,6 +24,9 @@ export const config = {
     // Reversal Configuration (separate API operator)
     reversalInitiatorName: process.env.MPESA_REVERSAL_INITIATOR_NAME || '',
     reversalSecurityCredential: process.env.MPESA_REVERSAL_SECURITY_CREDENTIAL || '',
+    // C2B Configuration (direct paybill deposits)
+    c2bValidationUrl: process.env.MPESA_C2B_VALIDATION_URL || '',
+    c2bConfirmationUrl: process.env.MPESA_C2B_CONFIRMATION_URL || '',
   },
 
   jwt: {

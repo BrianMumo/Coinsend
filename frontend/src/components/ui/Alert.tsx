@@ -1,56 +1,38 @@
-import { HTMLAttributes, forwardRef } from 'react';
-import { clsx } from 'clsx';
-import { AlertCircle, CheckCircle, Info, XCircle } from 'lucide-react';
+import { HTMLAttributes } from 'react';
+import { AlertCircle, Info, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface AlertProps extends HTMLAttributes<HTMLDivElement> {
   variant?: 'info' | 'success' | 'warning' | 'error';
   title?: string;
 }
 
-const icons = {
-  info: Info,
-  success: CheckCircle,
-  warning: AlertCircle,
-  error: XCircle,
-};
-
 const variants = {
-  info: 'bg-blue-50 text-blue-800 border-blue-200',
-  success: 'bg-green-50 text-green-800 border-green-200',
-  warning: 'bg-yellow-50 text-yellow-800 border-yellow-200',
-  error: 'bg-red-50 text-red-800 border-red-200',
+  info:    { border: 'border-lavender-500/30', bg: 'bg-lavender-500/5', text: 'text-lavender-300', icon: Info },
+  success: { border: 'border-accent-500/30',   bg: 'bg-accent-500/5',   text: 'text-accent-400',   icon: CheckCircle },
+  warning: { border: 'border-gold-400/30',     bg: 'bg-gold-400/5',     text: 'text-gold-400',     icon: AlertTriangle },
+  error:   { border: 'border-red-500/30',      bg: 'bg-red-500/5',      text: 'text-red-400',      icon: AlertCircle },
 };
 
-const iconColors = {
-  info: 'text-blue-500',
-  success: 'text-green-500',
-  warning: 'text-yellow-500',
-  error: 'text-red-500',
-};
+export const Alert = ({
+  variant = 'info',
+  title,
+  children,
+  className = '',
+  ...props
+}: AlertProps) => {
+  const v = variants[variant];
+  const Icon = v.icon;
 
-export const Alert = forwardRef<HTMLDivElement, AlertProps>(
-  ({ className, variant = 'info', title, children, ...props }, ref) => {
-    const Icon = icons[variant];
-
-    return (
-      <div
-        ref={ref}
-        className={clsx(
-          'flex items-start gap-3 rounded-lg border p-4',
-          variants[variant],
-          className
-        )}
-        role="alert"
-        {...props}
-      >
-        <Icon className={clsx('h-5 w-5 flex-shrink-0', iconColors[variant])} />
-        <div className="flex-1">
-          {title && <h4 className="font-medium mb-1">{title}</h4>}
-          <div className="text-sm">{children}</div>
-        </div>
+  return (
+    <div
+      className={`flex items-start gap-3 rounded-xl border ${v.border} ${v.bg} backdrop-blur-sm p-4 ${className}`}
+      {...props}
+    >
+      <Icon className={`h-5 w-5 ${v.text} flex-shrink-0 mt-0.5`} />
+      <div>
+        {title && <p className={`text-sm font-semibold ${v.text} mb-0.5`}>{title}</p>}
+        <div className="text-sm text-surface-300">{children}</div>
       </div>
-    );
-  }
-);
-
-Alert.displayName = 'Alert';
+    </div>
+  );
+};

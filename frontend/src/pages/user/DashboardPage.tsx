@@ -94,28 +94,28 @@ const DashboardPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center ring-2 ring-teal-200">
-            <span className="text-teal-700 font-bold text-sm">
+          <div className="w-10 h-10 bg-gold-400/15 border border-gold-400/25 rounded-full flex items-center justify-center">
+            <span className="text-gold-400 font-bold text-sm">
               {(user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
             </span>
           </div>
           <div>
-            <p className="text-xs text-gray-400">Good day,</p>
-            <p className="font-semibold text-gray-900 leading-tight">
+            <p className="text-xs text-surface-500">Good day,</p>
+            <p className="font-semibold text-surface-100 leading-tight">
               {firstName.charAt(0).toUpperCase() + firstName.slice(1)}
             </p>
           </div>
         </div>
         <button
           onClick={() => fetchData(true)}
-          className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${refreshing ? 'animate-spin' : ''}`}
+          className={`p-2 rounded-full hover:bg-surface-700/30 transition-colors ${refreshing ? 'animate-spin' : ''}`}
         >
-          <RefreshCw className="h-4 w-4 text-gray-400" />
+          <RefreshCw className="h-4 w-4 text-surface-500" />
         </button>
       </div>
 
       {/* Balance Card */}
-      <div className="relative rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%)' }}>
+      <div className="relative rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #1E1038 0%, #3B1F7C 40%, #8B5E14 100%)' }}>
         {/* Decorative circles */}
         <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/5" />
         <div className="absolute -right-4 -bottom-8 w-28 h-28 rounded-full bg-white/5" />
@@ -128,15 +128,15 @@ const DashboardPage = () => {
               <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
                 <span className="text-xs">₿</span>
               </div>
-              <span className="text-teal-100 text-xs font-medium tracking-wide uppercase">Total Balance</span>
+              <span className="text-lavender-300/80 text-xs font-medium tracking-wide uppercase">Total Balance</span>
             </div>
             <button
               onClick={() => setShowBalance(!showBalance)}
               className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
             >
               {showBalance
-                ? <EyeOff className="h-4 w-4 text-teal-200" />
-                : <Eye className="h-4 w-4 text-teal-200" />
+                ? <EyeOff className="h-4 w-4 text-lavender-300/70" />
+                : <Eye className="h-4 w-4 text-lavender-300/70" />
               }
             </button>
           </div>
@@ -150,7 +150,7 @@ const DashboardPage = () => {
           </p>
 
           {/* USDT equivalent */}
-          <p className="text-sm text-teal-200 mb-5">
+          <p className="text-sm text-lavender-300/50 mb-5">
             {showBalance
               ? `≈ $${usdtNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
               : '≈ $•••• USDT'
@@ -160,7 +160,7 @@ const DashboardPage = () => {
           {/* Stats row */}
           <div className="flex items-center gap-1 mb-5">
             <div className="flex items-center gap-1 bg-white/10 rounded-lg px-2.5 py-1.5">
-              <TrendingUp className="h-3 w-3 text-teal-200" />
+              <TrendingUp className="h-3 w-3 text-lavender-300/80" />
               <span className="text-xs text-white font-medium">
                 1 USDT = KES {usdtRate.toLocaleString()}
               </span>
@@ -175,7 +175,7 @@ const DashboardPage = () => {
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => navigate('/wallet', { state: { action: 'deposit' } })}
-              className="flex items-center justify-center gap-2 bg-white text-teal-700 py-2.5 rounded-xl font-semibold text-sm hover:bg-teal-50 transition-colors shadow-sm"
+              className="flex items-center justify-center gap-2 bg-white text-dark-900 py-2.5 rounded-xl font-semibold text-sm hover:bg-gold-100 transition-colors shadow-sm"
             >
               <ArrowDownLeft className="h-4 w-4" />
               Deposit USDT
@@ -192,12 +192,12 @@ const DashboardPage = () => {
       </div>
 
       {/* Recent Transactions */}
-      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-50">
-          <h3 className="font-semibold text-gray-900 text-sm">Recent Transactions</h3>
+      <div className="bg-dark-800/60 backdrop-blur-xl rounded-2xl overflow-hidden border border-surface-700/50">
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-surface-700/30">
+          <h3 className="font-semibold text-surface-100 text-sm">Recent Transactions</h3>
           <Link
             to="/wallet"
-            className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-0.5 font-medium"
+            className="text-xs text-gold-400 hover:text-gold-300 flex items-center gap-0.5 font-medium transition-colors"
           >
             See all <ChevronRight className="h-3.5 w-3.5" />
           </Link>
@@ -205,16 +205,16 @@ const DashboardPage = () => {
 
         {recentTransactions.length === 0 ? (
           <div className="text-center py-12 px-4">
-            <div className="w-14 h-14 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <div className="w-14 h-14 mx-auto mb-3 bg-surface-700/30 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-surface-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
             </div>
-            <p className="text-gray-500 text-sm mb-1 font-medium">No transactions yet</p>
-            <p className="text-gray-400 text-xs mb-3">Deposit USDT to get started</p>
+            <p className="text-surface-300 text-sm mb-1 font-medium">No transactions yet</p>
+            <p className="text-surface-500 text-xs mb-3">Deposit USDT to get started</p>
             <button
               onClick={() => navigate('/wallet', { state: { action: 'deposit' } })}
-              className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 font-medium bg-teal-50 px-4 py-2 rounded-lg"
+              className="inline-flex items-center gap-1.5 text-sm text-gold-400 hover:text-gold-300 font-medium bg-gold-400/10 border border-gold-400/20 px-4 py-2 rounded-lg transition-colors"
             >
               <ArrowDownLeft className="h-4 w-4" />
               Make your first deposit
@@ -233,24 +233,24 @@ const DashboardPage = () => {
                 <Link
                   key={tx.id}
                   to="/wallet"
-                  className={`flex items-center justify-between px-4 py-3 hover:bg-gray-50/80 transition-colors ${index !== 0 ? 'border-t border-gray-50' : ''}`}
+                  className={`flex items-center justify-between px-4 py-3 hover:bg-surface-700/20 transition-colors ${index !== 0 ? 'border-t border-surface-700/20' : ''}`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${credit ? 'bg-teal-50' : 'bg-red-50'}`}>
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${credit ? 'bg-accent-500/15 border border-accent-500/20' : 'bg-red-500/15 border border-red-500/20'}`}>
                       {credit
-                        ? <ArrowDownLeft className="h-4 w-4 text-teal-600" />
-                        : <ArrowUpRight className="h-4 w-4 text-red-500" />
+                        ? <ArrowDownLeft className="h-4 w-4 text-accent-400" />
+                        : <ArrowUpRight className="h-4 w-4 text-red-400" />
                       }
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800 leading-tight">
+                      <p className="text-sm font-medium text-surface-200 leading-tight">
                         {formatTransactionType(tx.type)}
                       </p>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(tx.createdAt)}</p>
+                      <p className="text-xs text-surface-500 mt-0.5">{formatDate(tx.createdAt)}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-sm font-semibold ${credit ? 'text-teal-600' : 'text-red-500'}`}>
+                    <p className={`text-sm font-semibold ${credit ? 'text-accent-400' : 'text-red-400'}`}>
                       {amount}
                     </p>
                     <Badge variant={getStatusVariant(tx.status)} className="text-[10px] mt-0.5">
@@ -261,10 +261,10 @@ const DashboardPage = () => {
               );
             })}
 
-            <div className="px-4 py-3 border-t border-gray-50">
+            <div className="px-4 py-3 border-t border-surface-700/20">
               <Link
                 to="/wallet"
-                className="flex items-center justify-center gap-1.5 text-sm text-teal-600 font-medium hover:text-teal-700"
+                className="flex items-center justify-center gap-1.5 text-sm text-gold-400 font-medium hover:text-gold-300 transition-colors"
               >
                 View all transactions <ChevronRight className="h-4 w-4" />
               </Link>
@@ -274,14 +274,14 @@ const DashboardPage = () => {
       </div>
 
       {/* Info banner */}
-      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-100 rounded-2xl p-4">
+      <div className="bg-gold-400/10 border border-gold-400/20 rounded-2xl p-4">
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Zap className="h-4 w-4 text-teal-600" />
+          <div className="w-8 h-8 bg-gold-400/15 border border-gold-400/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Zap className="h-4 w-4 text-gold-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-teal-900 mb-0.5">Automatic Deposits</p>
-            <p className="text-xs text-teal-700 leading-relaxed">
+            <p className="text-sm font-semibold text-gold-300 mb-0.5">Automatic Deposits</p>
+            <p className="text-xs text-gold-400/70 leading-relaxed">
               Send USDT to your personal address and your balance updates automatically — no manual verification needed.
             </p>
           </div>

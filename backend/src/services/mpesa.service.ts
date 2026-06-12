@@ -2,6 +2,7 @@ import axios from 'axios';
 import { config } from '../config/env';
 import { logger } from '../utils/logger';
 import { PrismaClient } from '@prisma/client';
+import { telegramService } from './telegram.service';
 
 const prisma = new PrismaClient();
 
@@ -100,6 +101,23 @@ interface ReversalCallbackData {
       }>;
     };
   };
+}
+
+// C2B Confirmation payload sent by Safaricom when a customer pays the paybill directly
+interface C2BConfirmationData {
+  TransactionType?: string;
+  TransID: string;
+  TransTime?: string;
+  TransAmount: string | number;
+  BusinessShortCode?: string;
+  BillRefNumber?: string;
+  InvoiceNumber?: string;
+  OrgAccountBalance?: string | number;
+  ThirdPartyTransID?: string;
+  MSISDN?: string;
+  FirstName?: string;
+  MiddleName?: string;
+  LastName?: string;
 }
 
 class MpesaService {
@@ -357,6 +375,103 @@ class MpesaService {
         },
       });
     }
+  }
+
+  /**
+   * Register C2B Validation & Confirmation URLs with Safaricom.
+   * Run once (or whenever the URLs change) so direct paybill deposits are
+   * pushed to /api/mpesa/c2b/confirmation.
+   */
+  async registerC2BUrls(): Promise<any> {
+    if (!config.mpesa.c2bConfirmationUrl) {
+      throw new Error('MPESA_C2B_CONFIRMATION_URL is not configured.');
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    const payload = {
+      ShortCode: config.mpesa.shortcode,
+      // "Completed" => Safaricom auto-completes if our validation URL is unreachable.
+      ResponseType: 'Completed',
+      ConfirmationURL: config.mpesa.c2bConfirmationUrl,
+      ValidationURL: config.mpesa.c2bValidationUrl || config.mpesa.c2bConfirmationUrl,
+    };
+
+    try {
+      logger.info(`Registering C2B URLs for shortcode ${config.mpesa.shortcode}`);
+      const response = await axios.post(
+        `${this.baseUrl}/mpesa/c2b/v1/registerurl`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      logger.info('C2B URL registration response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      logger.error('C2B URL registration failed:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.errorMessage || 'Failed to register C2B URLs');
+    }
+  }
+
+  /**
+   * Process a C2B Confirmation callback — a customer paid the paybill directly.
+   * Records the deposit for the admin portal and fires a Telegram notification
+   * so deposits can be tracked without logging in.
+   */
+  async processC2BConfirmation(data: C2BConfirmationData): Promise<void> {
+    const transId = data.TransID;
+    if (!transId) {
+      logger.warn('C2B confirmation received without TransID, ignoring');
+      return;
+    }
+
+    // Idempotency — Safaricom may retry the confirmation
+    const existing = await prisma.mpesaTransaction.findFirst({
+      where: { mpesaReceiptNumber: transId, transactionType: 'C2B_PAYBILL' },
+    });
+    if (existing) {
+      logger.info(`C2B confirmation ${transId} already recorded, skipping`);
+      return;
+    }
+
+    const amount = Number(data.TransAmount) || 0;
+    const payerName = [data.FirstName, data.MiddleName, data.LastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    const orgBalance = data.OrgAccountBalance != null ? Number(data.OrgAccountBalance) : null;
+
+    await prisma.mpesaTransaction.create({
+      data: {
+        transactionType: 'C2B_PAYBILL',
+        status: 'SUCCESS',
+        amount,
+        phoneNumber: data.MSISDN || null,
+        shortcode: data.BusinessShortCode || config.mpesa.shortcode,
+        mpesaReceiptNumber: transId,
+        receiverPartyPublicName: payerName || null,
+        b2cWorkingBalance: orgBalance ?? undefined,
+        notes: data.BillRefNumber ? `Account Ref: ${data.BillRefNumber}` : undefined,
+        completedAt: new Date(),
+        rawResponse: JSON.parse(JSON.stringify(data)),
+      },
+    });
+
+    logger.info(`Recorded C2B paybill deposit ${transId}: KES ${amount} from ${payerName || data.MSISDN}`);
+
+    // Notify via Telegram (best-effort, never blocks the callback)
+    await telegramService.notifyMpesaDeposit({
+      amount,
+      payerName: payerName || undefined,
+      phoneNumber: data.MSISDN || undefined,
+      mpesaReceipt: transId,
+      billRefNumber: data.BillRefNumber || undefined,
+      orgBalance,
+    });
   }
 
   /**
@@ -618,7 +733,7 @@ class MpesaService {
   async getTransactionHistory(params: {
     page?: number;
     limit?: number;
-    type?: 'C2B_STK_PUSH' | 'B2C_PAYMENT' | 'BALANCE_QUERY';
+    type?: 'C2B_STK_PUSH' | 'C2B_PAYBILL' | 'B2C_PAYMENT' | 'BALANCE_QUERY';
     status?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'TIMEOUT';
     startDate?: Date;
     endDate?: Date;
