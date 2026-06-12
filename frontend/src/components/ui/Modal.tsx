@@ -31,7 +31,7 @@ export const Modal = ({
     <Fragment>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity"
+        className="fixed inset-0 bg-black/50 z-50 transition-opacity"
         onClick={onClose}
       />
 
@@ -39,21 +39,21 @@ export const Modal = ({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
           className={clsx(
-            'bg-dark-800/95 backdrop-blur-xl rounded-2xl shadow-glass-lg border border-surface-700/50 w-full transform transition-all animate-fade-in',
+            'bg-white rounded-xl shadow-xl w-full transform transition-all',
             sizes[size]
           )}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           {(title || showCloseButton) && (
-            <div className="flex items-center justify-between px-6 py-4 border-b border-surface-700/50">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
               {title && (
-                <h3 className="text-lg font-semibold text-surface-50">{title}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
               )}
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="p-1.5 text-surface-400 hover:text-surface-200 hover:bg-surface-700/50 rounded-lg transition-colors"
+                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -95,16 +95,16 @@ export const ConfirmModal = ({
 }: ConfirmModalProps) => {
   const variantStyles = {
     danger: {
-      icon: 'bg-red-500/15 text-red-400',
+      icon: 'bg-red-100 text-red-600',
       button: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
     },
     warning: {
-      icon: 'bg-yellow-500/15 text-yellow-400',
+      icon: 'bg-yellow-100 text-yellow-600',
       button: 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500',
     },
     info: {
-      icon: 'bg-primary-500/15 text-primary-400',
-      button: 'bg-primary-600 hover:bg-primary-700 focus:ring-primary-500',
+      icon: 'bg-blue-100 text-blue-600',
+      button: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
     },
   };
 
@@ -138,17 +138,17 @@ export const ConfirmModal = ({
         </div>
 
         {/* Title */}
-        <h3 className="text-lg font-semibold text-surface-50 mb-2">{title}</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
 
         {/* Message */}
-        <div className="text-sm text-surface-400 mb-6">{message}</div>
+        <div className="text-sm text-gray-600 mb-6">{message}</div>
 
         {/* Actions */}
         <div className="flex gap-3 justify-center">
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2.5 text-sm font-medium text-surface-300 bg-surface-700/50 border border-surface-600/50 rounded-xl hover:bg-surface-600/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-900 focus:ring-surface-500 disabled:opacity-50 transition-all"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
           >
             {cancelText}
           </button>
@@ -156,7 +156,7 @@ export const ConfirmModal = ({
             onClick={onConfirm}
             disabled={isLoading}
             className={clsx(
-              'px-4 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-900 disabled:opacity-50 flex items-center transition-all',
+              'px-4 py-2 text-sm font-medium text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 flex items-center',
               styles.button
             )}
           >

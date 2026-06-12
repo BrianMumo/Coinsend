@@ -237,27 +237,27 @@ const WalletPage = () => {
     <div className="space-y-4 pb-4">
 
       {/* Balance Card */}
-      <div className="relative rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #1E1038 0%, #3B1F7C 40%, #8B5E14 100%)' }}>
+      <div className="relative rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%)' }}>
         <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/5" />
         <div className="absolute -right-4 -bottom-8 w-28 h-28 rounded-full bg-white/5" />
 
         <div className="relative p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span className="text-lavender-300/80 text-xs font-medium tracking-wide uppercase">Wallet Balance</span>
+              <span className="text-teal-200 text-xs font-medium tracking-wide uppercase">Wallet Balance</span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => fetchBalance(true)}
                 className={`p-1.5 hover:bg-white/10 rounded-full transition-colors ${refreshing ? 'animate-spin' : ''}`}
               >
-                <RefreshCw className="h-4 w-4 text-lavender-300/70" />
+                <RefreshCw className="h-4 w-4 text-teal-200" />
               </button>
               <button
                 onClick={() => setShowBalance(!showBalance)}
                 className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
               >
-                {showBalance ? <EyeOff className="h-4 w-4 text-lavender-300/70" /> : <Eye className="h-4 w-4 text-lavender-300/70" />}
+                {showBalance ? <EyeOff className="h-4 w-4 text-teal-200" /> : <Eye className="h-4 w-4 text-teal-200" />}
               </button>
             </div>
           </div>
@@ -268,14 +268,14 @@ const WalletPage = () => {
               : 'KES ••••••'
             }
           </p>
-          <p className="text-sm text-lavender-300/50 mb-4">
+          <p className="text-sm text-teal-200 mb-4">
             {showBalance ? `≈ $${usdtBalance.toFixed(2)} USDT` : '≈ $•••• USDT'}
           </p>
 
           {usdtRate > 0 && (
             <div className="flex items-center gap-1.5 mb-5">
               <div className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1.5">
-                <TrendingUp className="h-3 w-3 text-lavender-300/80" />
+                <TrendingUp className="h-3 w-3 text-teal-200" />
                 <span className="text-xs text-white font-medium">1 USDT = KES {usdtRate.toLocaleString()}</span>
               </div>
             </div>
@@ -284,7 +284,7 @@ const WalletPage = () => {
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setShowDepositModal(true)}
-              className="flex items-center justify-center gap-2 bg-white text-dark-900 py-2.5 rounded-xl font-semibold text-sm hover:bg-gold-100 transition-colors shadow-sm"
+              className="flex items-center justify-center gap-2 bg-white text-teal-700 py-2.5 rounded-xl font-semibold text-sm hover:bg-teal-50 transition-colors shadow-sm"
             >
               <ArrowDownLeft className="h-4 w-4" />
               Deposit USDT
@@ -302,9 +302,9 @@ const WalletPage = () => {
       </div>
 
       {/* Transaction List */}
-      <div className="bg-dark-800/60 backdrop-blur-xl rounded-2xl overflow-hidden border border-surface-700/50">
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
         {/* Tabs */}
-        <div className="flex border-b border-surface-700/30">
+        <div className="flex border-b border-gray-100">
           {[
             { key: 'all', label: 'All' },
             { key: 'deposits', label: 'Deposits' },
@@ -315,8 +315,8 @@ const WalletPage = () => {
               onClick={() => setActiveTab(tab.key as TabType)}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${
                 activeTab === tab.key
-                  ? 'text-gold-400 border-b-2 border-primary-500'
-                  : 'text-surface-500 hover:text-surface-300'
+                  ? 'text-teal-600 border-b-2 border-teal-500'
+                  : 'text-gray-400 hover:text-gray-600'
               }`}
             >
               {tab.label}
@@ -331,22 +331,22 @@ const WalletPage = () => {
               return (
                 <div
                   key={tx.id}
-                  className={`flex items-center justify-between px-4 py-3 hover:bg-surface-700/15 transition-colors ${index !== 0 ? 'border-t border-surface-700/20' : ''}`}
+                  className={`flex items-center justify-between px-4 py-3 hover:bg-gray-50/80 transition-colors ${index !== 0 ? 'border-t border-gray-50' : ''}`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${credit ? 'bg-accent-500/15 border border-accent-500/20' : 'bg-red-500/15 border border-red-500/20'}`}>
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${credit ? 'bg-teal-50' : 'bg-red-50'}`}>
                       {credit
-                        ? <ArrowDownLeft className="h-4 w-4 text-accent-400" />
-                        : <ArrowUpRight className="h-4 w-4 text-red-400" />
+                        ? <ArrowDownLeft className="h-4 w-4 text-teal-600" />
+                        : <ArrowUpRight className="h-4 w-4 text-red-500" />
                       }
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-surface-200 leading-tight">{formatTxType(tx.type)}</p>
-                      <p className="text-xs text-surface-500 mt-0.5">{formatDate(tx.createdAt)}</p>
+                      <p className="text-sm font-medium text-gray-800 leading-tight">{formatTxType(tx.type)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(tx.createdAt)}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-sm font-semibold ${credit ? 'text-accent-400' : 'text-red-400'}`}>{text}</p>
+                    <p className={`text-sm font-semibold ${credit ? 'text-teal-600' : 'text-red-500'}`}>{text}</p>
                     <Badge variant={getStatusVariant(tx.status)} className="text-[10px] mt-0.5">
                       {tx.status}
                     </Badge>
@@ -357,42 +357,42 @@ const WalletPage = () => {
           </div>
         ) : (
           <div className="text-center py-12 px-4">
-            <div className="w-12 h-12 mx-auto mb-3 bg-surface-700/30 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-surface-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
             </div>
-            <p className="text-surface-300 text-sm font-medium">No {activeTab === 'all' ? '' : activeTab} transactions yet</p>
+            <p className="text-gray-500 text-sm font-medium">No {activeTab === 'all' ? '' : activeTab} transactions yet</p>
           </div>
         )}
       </div>
 
       {/* ─── DEPOSIT MODAL ─────────────────────────────────── */}
       {showDepositModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 px-0 sm:px-4">
-          <div className="bg-dark-800/95 backdrop-blur-xl border border-surface-700/50 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto shadow-glass-lg">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 px-0 sm:px-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
 
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1 sm:hidden">
-              <div className="w-10 h-1 bg-surface-600 rounded-full" />
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
 
             <div className="p-5">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-bold text-surface-50">Deposit USDT</h2>
-                <button onClick={closeDepositModal} className="p-2 hover:bg-surface-700/50 rounded-full transition-colors">
-                  <X className="h-5 w-5 text-surface-400" />
+                <h2 className="text-lg font-bold text-gray-900">Deposit USDT</h2>
+                <button onClick={closeDepositModal} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                  <X className="h-5 w-5 text-gray-500" />
                 </button>
               </div>
 
               {/* Auto-credit banner */}
-              <div className="flex items-start gap-3 bg-gold-400/10 border border-gold-400/20 rounded-2xl p-3.5 mb-5">
-                <div className="w-8 h-8 bg-gold-400/15 border border-gold-400/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Zap className="h-4 w-4 text-gold-400" />
+              <div className="flex items-start gap-3 bg-teal-50 border border-teal-100 rounded-2xl p-3.5 mb-5">
+                <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Zap className="h-4 w-4 text-teal-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gold-300">Automatic — no verification needed</p>
-                  <p className="text-xs text-gold-400/70 mt-0.5 leading-relaxed">
+                  <p className="text-sm font-semibold text-teal-900">Automatic — no verification needed</p>
+                  <p className="text-xs text-teal-700 mt-0.5 leading-relaxed">
                     Send USDT to your address below. Your balance updates automatically within ~30 seconds.
                   </p>
                 </div>
@@ -400,17 +400,17 @@ const WalletPage = () => {
 
               {/* Your personal address */}
               <div className="mb-4">
-                <p className="text-xs text-surface-500 font-medium uppercase tracking-wide mb-2">Your Personal TRC-20 Address</p>
-                <div className="bg-dark-900/80 border border-surface-700/50 rounded-2xl p-4">
-                  <p className="font-mono text-sm text-surface-200 break-all leading-relaxed mb-3">
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">Your Personal TRC-20 Address</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                  <p className="font-mono text-sm text-gray-800 break-all leading-relaxed mb-3">
                     {depositAddress || 'Loading...'}
                   </p>
                   <button
                     onClick={copyAddress}
                     className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition-all ${
                       copied
-                        ? 'bg-accent-500 text-white'
-                        : 'bg-gold-400 text-white hover:bg-gold-300 shadow-glow-sm'
+                        ? 'bg-teal-600 text-white'
+                        : 'bg-gray-900 text-white hover:bg-gray-800'
                     }`}
                   >
                     {copied ? (
@@ -429,9 +429,9 @@ const WalletPage = () => {
               </div>
 
               {/* Network warning */}
-              <div className="flex items-start gap-2.5 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 mb-4">
-                <span className="text-yellow-400 text-base leading-none mt-0.5">⚠️</span>
-                <p className="text-xs text-yellow-300">
+              <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+                <span className="text-amber-500 text-base leading-none mt-0.5">⚠️</span>
+                <p className="text-xs text-amber-800">
                   <strong>TRON (TRC-20) Network Only.</strong> Sending on any other network will result in permanent loss of funds.
                 </p>
               </div>
@@ -444,33 +444,33 @@ const WalletPage = () => {
                   { n: '3', text: 'Your balance updates automatically — no action needed' },
                 ].map((step) => (
                   <div key={step.n} className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-gold-400/15 border border-gold-400/20 text-gold-400 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">
+                    <div className="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">
                       {step.n}
                     </div>
-                    <p className="text-sm text-surface-400">{step.text}</p>
+                    <p className="text-sm text-gray-600">{step.text}</p>
                   </div>
                 ))}
               </div>
 
               {/* Security note */}
-              <div className="flex items-center gap-2 text-xs text-surface-500 mb-5">
+              <div className="flex items-center gap-2 text-xs text-gray-400 mb-5">
                 <Shield className="h-3.5 w-3.5" />
                 <span>This address is unique to your account and never changes</span>
               </div>
 
               {/* Manual verify collapse */}
-              <div className="border border-surface-700/50 rounded-xl overflow-hidden">
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setShowManualVerify(!showManualVerify)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-sm text-surface-400 hover:bg-surface-700/20 transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                 >
                   <span className="font-medium">Didn't receive credit?</span>
                   {showManualVerify ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </button>
 
                 {showManualVerify && (
-                  <div className="px-4 pb-4 border-t border-surface-700/30 pt-3">
-                    <p className="text-xs text-surface-500 mb-3">
+                  <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+                    <p className="text-xs text-gray-500 mb-3">
                       If your balance hasn't updated after 2 minutes, submit your transaction hash for manual processing.
                     </p>
                     {verifyError && <Alert variant="error" className="text-xs mb-3">{verifyError}</Alert>}
@@ -498,7 +498,7 @@ const WalletPage = () => {
 
               <button
                 onClick={closeDepositModal}
-                className="w-full mt-3 py-3 text-sm font-medium text-surface-500 hover:text-surface-300 transition-colors"
+                className="w-full mt-3 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
               >
                 Done
               </button>
@@ -509,32 +509,32 @@ const WalletPage = () => {
 
       {/* ─── WITHDRAW MODAL ────────────────────────────────── */}
       {showWithdrawModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 px-0 sm:px-4">
-          <div className="bg-dark-800/95 backdrop-blur-xl border border-surface-700/50 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md shadow-glass-lg">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 px-0 sm:px-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md">
 
             <div className="flex justify-center pt-3 pb-1 sm:hidden">
-              <div className="w-10 h-1 bg-surface-600 rounded-full" />
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
 
             <div className="p-5">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-bold text-surface-50">Withdraw to M-Pesa</h2>
+                <h2 className="text-lg font-bold text-gray-900">Withdraw to M-Pesa</h2>
                 <button
                   onClick={() => { setShowWithdrawModal(false); setWithdrawError(null); setWithdrawSuccess(null); setWithdrawAmount(''); }}
-                  className="p-2 hover:bg-surface-700/50 rounded-full transition-colors"
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  <X className="h-5 w-5 text-surface-400" />
+                  <X className="h-5 w-5 text-gray-500" />
                 </button>
               </div>
 
               {/* Available balance */}
-              <div className="bg-gold-400/10 border border-gold-400/20 rounded-2xl p-4 mb-5 text-center">
-                <p className="text-xs text-gold-400 font-medium mb-1">Available Balance</p>
-                <p className="text-2xl font-bold text-surface-50">
+              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-100 rounded-2xl p-4 mb-5 text-center">
+                <p className="text-xs text-teal-600 font-medium mb-1">Available Balance</p>
+                <p className="text-2xl font-bold text-teal-900">
                   KES {kesEquivalent.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
                 {usdtRate > 0 && (
-                  <p className="text-xs text-gold-400/70 mt-1">≈ ${usdtBalance.toFixed(2)} USDT</p>
+                  <p className="text-xs text-teal-600 mt-1">≈ ${usdtBalance.toFixed(2)} USDT</p>
                 )}
               </div>
 
@@ -557,9 +557,9 @@ const WalletPage = () => {
 
                 {/* KES → USDT preview */}
                 {withdrawAmount && usdtRate > 0 && (
-                  <div className="bg-dark-900/80 border border-surface-700/50 rounded-xl p-3 flex items-center justify-between text-sm">
-                    <span className="text-surface-400">You send</span>
-                    <span className="font-semibold text-surface-100">
+                  <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between text-sm">
+                    <span className="text-gray-500">You send</span>
+                    <span className="font-semibold text-gray-900">
                       ${(parseFloat(withdrawAmount) / usdtRate).toFixed(2)} USDT
                     </span>
                   </div>
@@ -575,7 +575,7 @@ const WalletPage = () => {
                   disabled={isSubmitting}
                 />
 
-                <p className="text-xs text-surface-500 text-center">Min KES 100 · Max KES 250,000</p>
+                <p className="text-xs text-gray-400 text-center">Min KES 100 · Max KES 250,000</p>
 
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <Button
@@ -588,7 +588,7 @@ const WalletPage = () => {
                   </Button>
                   <Button
                     type="submit"
-                    className="bg-accent-500 hover:bg-accent-600 shadow-glow-gold"
+                    className="bg-teal-600 hover:bg-teal-700"
                     isLoading={isSubmitting}
                   >
                     Send to M-Pesa

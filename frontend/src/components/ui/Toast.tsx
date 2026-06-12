@@ -11,17 +11,17 @@ const icons = {
 };
 
 const styles = {
-  success: 'bg-dark-800/90 backdrop-blur-xl border-accent-500/30 text-accent-300',
-  error: 'bg-dark-800/90 backdrop-blur-xl border-red-500/30 text-red-300',
-  warning: 'bg-dark-800/90 backdrop-blur-xl border-yellow-500/30 text-yellow-300',
-  info: 'bg-dark-800/90 backdrop-blur-xl border-primary-500/30 text-primary-300',
+  success: 'bg-green-50 border-green-200 text-green-800',
+  error: 'bg-red-50 border-red-200 text-red-800',
+  warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+  info: 'bg-blue-50 border-blue-200 text-blue-800',
 };
 
 const iconStyles = {
-  success: 'text-accent-400',
-  error: 'text-red-400',
-  warning: 'text-yellow-400',
-  info: 'text-primary-400',
+  success: 'text-green-500',
+  error: 'text-red-500',
+  warning: 'text-yellow-500',
+  info: 'text-blue-500',
 };
 
 const ToastItem = ({ toast }: { toast: ToastType }) => {
@@ -43,7 +43,7 @@ const ToastItem = ({ toast }: { toast: ToastType }) => {
   return (
     <div
       className={clsx(
-        'flex items-center gap-3 px-4 py-3 rounded-xl border shadow-glass transition-all duration-200',
+        'flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg transition-all duration-200',
         styles[toast.type],
         isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
       )}
@@ -52,9 +52,9 @@ const ToastItem = ({ toast }: { toast: ToastType }) => {
       <p className="flex-1 text-sm font-medium">{toast.message}</p>
       <button
         onClick={handleClose}
-        className="flex-shrink-0 p-1 rounded hover:bg-surface-700/50 transition-colors"
+        className="flex-shrink-0 p-1 rounded hover:bg-black/5 transition-colors"
       >
-        <X className="h-4 w-4 text-surface-400" />
+        <X className="h-4 w-4" />
       </button>
     </div>
   );

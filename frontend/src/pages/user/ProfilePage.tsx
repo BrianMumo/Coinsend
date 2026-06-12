@@ -115,41 +115,41 @@ const ProfilePage = () => {
   return (
     <div className="space-y-4">
       {/* Profile Header */}
-      <div className="bg-dark-800/60 backdrop-blur-xl border border-surface-700/50 rounded-2xl p-4">
+      <div className="bg-white rounded-xl p-4">
         <div className="flex items-center gap-3">
-          <div className="w-14 h-14 bg-gold-400/15 border border-gold-400/25 rounded-full flex items-center justify-center">
-            <span className="text-gold-400 font-bold text-xl">
+          <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
+            <span className="text-green-600 font-bold text-xl">
               {user?.firstName?.[0] || user?.email?.[0] || 'U'}
             </span>
           </div>
           <div className="flex-1">
-            <p className="font-semibold text-surface-100">
+            <p className="font-semibold text-gray-900">
               {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'User'}
             </p>
-            <p className="text-sm text-surface-400">{user?.email}</p>
+            <p className="text-sm text-gray-500">{user?.email}</p>
           </div>
           <Badge variant={kycVariant} className="text-xs">{kycStatus.label}</Badge>
         </div>
       </div>
 
       {/* Menu Items */}
-      <div className="bg-dark-800/60 backdrop-blur-xl border border-surface-700/50 rounded-2xl overflow-hidden">
+      <div className="bg-white rounded-xl overflow-hidden">
         {/* Edit Profile */}
         <button
           onClick={() => setActiveSection(activeSection === 'profile' ? null : 'profile')}
-          className="w-full flex items-center justify-between p-4 hover:bg-surface-700/15 border-b border-surface-700/30 transition-colors"
+          className="w-full flex items-center justify-between p-4 hover:bg-gray-50 border-b border-gray-100"
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gold-400/15 border border-gold-400/20 rounded-full flex items-center justify-center">
-              <User className="h-4 w-4 text-gold-400" />
+            <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center">
+              <User className="h-4 w-4 text-blue-600" />
             </div>
-            <span className="font-medium text-surface-200">Edit Profile</span>
+            <span className="font-medium text-gray-900">Edit Profile</span>
           </div>
-          <ChevronRight className={`h-5 w-5 text-surface-500 transition-transform ${activeSection === 'profile' ? 'rotate-90' : ''}`} />
+          <ChevronRight className={`h-5 w-5 text-gray-400 transition-transform ${activeSection === 'profile' ? 'rotate-90' : ''}`} />
         </button>
 
         {activeSection === 'profile' && (
-          <div className="p-4 bg-dark-900/50 border-b border-surface-700/30">
+          <div className="p-4 bg-gray-50 border-b border-gray-100">
             {profileSuccess && <Alert variant="success" className="mb-4 text-sm">{profileSuccess}</Alert>}
             {profileError && <Alert variant="error" className="mb-4 text-sm">{profileError}</Alert>}
 
@@ -180,19 +180,19 @@ const ProfilePage = () => {
         {/* Change Password */}
         <button
           onClick={() => setActiveSection(activeSection === 'password' ? null : 'password')}
-          className="w-full flex items-center justify-between p-4 hover:bg-surface-700/15 border-b border-surface-700/30 transition-colors"
+          className="w-full flex items-center justify-between p-4 hover:bg-gray-50 border-b border-gray-100"
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-purple-500/15 border border-purple-500/20 rounded-full flex items-center justify-center">
-              <Lock className="h-4 w-4 text-purple-400" />
+            <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
+              <Lock className="h-4 w-4 text-purple-600" />
             </div>
-            <span className="font-medium text-surface-200">Change Password</span>
+            <span className="font-medium text-gray-900">Change Password</span>
           </div>
-          <ChevronRight className={`h-5 w-5 text-surface-500 transition-transform ${activeSection === 'password' ? 'rotate-90' : ''}`} />
+          <ChevronRight className={`h-5 w-5 text-gray-400 transition-transform ${activeSection === 'password' ? 'rotate-90' : ''}`} />
         </button>
 
         {activeSection === 'password' && (
-          <div className="p-4 bg-dark-900/50 border-b border-surface-700/30">
+          <div className="p-4 bg-gray-50 border-b border-gray-100">
             {passwordSuccess && <Alert variant="success" className="mb-4 text-sm">{passwordSuccess}</Alert>}
             {passwordError && <Alert variant="error" className="mb-4 text-sm">{passwordError}</Alert>}
 
@@ -223,14 +223,14 @@ const ProfilePage = () => {
         )}
 
         {/* Verification Status */}
-        <div className="flex items-center justify-between p-4 border-b border-surface-700/30">
+        <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-accent-500/15 border border-accent-500/20 rounded-full flex items-center justify-center">
-              <Shield className="h-4 w-4 text-accent-400" />
+            <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
+              <Shield className="h-4 w-4 text-green-600" />
             </div>
             <div>
-              <span className="font-medium text-surface-200">Verification</span>
-              <p className="text-xs text-surface-500">
+              <span className="font-medium text-gray-900">Verification</span>
+              <p className="text-xs text-gray-500">
                 {user?.kycStatus === 'VERIFIED' ? 'Your account is verified' : 'Contact support to verify'}
               </p>
             </div>
@@ -243,42 +243,42 @@ const ProfilePage = () => {
           href={WHATSAPP_LINK}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-between p-4 hover:bg-surface-700/15 border-b border-surface-700/30 transition-colors"
+          className="flex items-center justify-between p-4 hover:bg-gray-50 border-b border-gray-100"
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-accent-500/15 border border-accent-500/20 rounded-full flex items-center justify-center">
-              <MessageCircle className="h-4 w-4 text-accent-400" />
+            <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
+              <MessageCircle className="h-4 w-4 text-green-600" />
             </div>
-            <span className="font-medium text-surface-200">WhatsApp Support</span>
+            <span className="font-medium text-gray-900">WhatsApp Support</span>
           </div>
-          <ChevronRight className="h-5 w-5 text-surface-500" />
+          <ChevronRight className="h-5 w-5 text-gray-400" />
         </a>
 
         {/* Logout */}
         <button
           onClick={logout}
-          className="w-full flex items-center justify-between p-4 hover:bg-surface-700/15 transition-colors"
+          className="w-full flex items-center justify-between p-4 hover:bg-gray-50"
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-red-500/15 border border-red-500/20 rounded-full flex items-center justify-center">
-              <LogOut className="h-4 w-4 text-red-400" />
+            <div className="w-9 h-9 bg-red-100 rounded-full flex items-center justify-center">
+              <LogOut className="h-4 w-4 text-red-600" />
             </div>
-            <span className="font-medium text-red-400">Log Out</span>
+            <span className="font-medium text-red-600">Log Out</span>
           </div>
         </button>
       </div>
 
       {/* Account Info */}
-      <div className="bg-dark-800/60 backdrop-blur-xl border border-surface-700/50 rounded-2xl p-4">
-        <p className="text-xs text-surface-500 mb-2">Account Details</p>
+      <div className="bg-white rounded-xl p-4">
+        <p className="text-xs text-gray-500 mb-2">Account Details</p>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
-            <p className="text-surface-500">Member Since</p>
-            <p className="font-medium text-surface-200">{user?.createdAt ? formatDate(user.createdAt) : 'N/A'}</p>
+            <p className="text-gray-500">Member Since</p>
+            <p className="font-medium">{user?.createdAt ? formatDate(user.createdAt) : 'N/A'}</p>
           </div>
           <div>
-            <p className="text-surface-500">Country</p>
-            <p className="font-medium text-surface-200">{user?.country || 'KE'}</p>
+            <p className="text-gray-500">Country</p>
+            <p className="font-medium">{user?.country || 'KE'}</p>
           </div>
         </div>
       </div>

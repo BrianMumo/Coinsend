@@ -36,14 +36,14 @@ const RatesPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-900 mesh-bg">
+    <div className="min-h-screen bg-gray-50">
       <PageTitle title="Exchange Rates" description="View current crypto and cross-border transfer rates on Coinsend." />
       <Header />
 
       <div className="max-w-4xl mx-auto py-12 px-4">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Exchange Rates</h1>
-          <p className="text-surface-400">Current rates for crypto and cross-border transfers</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Exchange Rates</h1>
+          <p className="text-gray-600">Current rates for crypto and cross-border transfers</p>
         </div>
 
         {isLoading ? (
@@ -63,26 +63,26 @@ const RatesPage = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="text-left text-sm text-surface-400 border-b border-surface-700/30">
+                      <tr className="text-left text-sm text-gray-500 border-b">
                         <th className="pb-3 font-medium">Pair</th>
                         <th className="pb-3 font-medium text-right">Buy Rate</th>
                         <th className="pb-3 font-medium text-right">Sell Rate</th>
                         <th className="pb-3 font-medium text-right">Spread</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-surface-700/20">
+                    <tbody className="divide-y">
                       {rates
                         .filter((rate) => rate.pair.includes('USDT') || rate.pair.includes('USDC'))
                         .map((rate) => (
-                          <tr key={rate.id} className="text-sm hover:bg-surface-700/10 transition-colors">
-                            <td className="py-3 font-medium text-surface-200">{formatPair(rate.pair)}</td>
-                            <td className="py-3 text-right text-accent-400">
+                          <tr key={rate.id} className="text-sm">
+                            <td className="py-3 font-medium">{formatPair(rate.pair)}</td>
+                            <td className="py-3 text-right text-green-600">
                               {parseFloat(rate.buyRate).toFixed(2)}
                             </td>
-                            <td className="py-3 text-right text-gold-400">
+                            <td className="py-3 text-right text-blue-600">
                               {parseFloat(rate.sellRate).toFixed(2)}
                             </td>
-                            <td className="py-3 text-right text-surface-400">
+                            <td className="py-3 text-right text-gray-500">
                               {(parseFloat(rate.spread) * 100).toFixed(2)}%
                             </td>
                           </tr>
@@ -102,14 +102,14 @@ const RatesPage = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="text-left text-sm text-surface-400 border-b border-surface-700/30">
+                      <tr className="text-left text-sm text-gray-500 border-b">
                         <th className="pb-3 font-medium">Destination</th>
                         <th className="pb-3 font-medium text-right">Rate</th>
                         <th className="pb-3 font-medium text-right">Min Amount</th>
                         <th className="pb-3 font-medium text-right">Max Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-surface-700/20">
+                    <tbody className="divide-y">
                       {rates
                         .filter((rate) => rate.pair.startsWith('KES_') && !rate.pair.includes('USD'))
                         .map((rate) => {
@@ -123,17 +123,17 @@ const RatesPage = () => {
                             AED: 'UAE',
                           };
                           return (
-                            <tr key={rate.id} className="text-sm hover:bg-surface-700/10 transition-colors">
-                              <td className="py-3 font-medium text-surface-200">
+                            <tr key={rate.id} className="text-sm">
+                              <td className="py-3 font-medium">
                                 {countryNames[to] || to} ({to})
                               </td>
-                              <td className="py-3 text-right text-surface-300">
+                              <td className="py-3 text-right">
                                 1 KES = {parseFloat(rate.sellRate).toFixed(4)} {to}
                               </td>
-                              <td className="py-3 text-right text-surface-400">
+                              <td className="py-3 text-right text-gray-500">
                                 KES {parseFloat(rate.minAmount).toLocaleString()}
                               </td>
-                              <td className="py-3 text-right text-surface-400">
+                              <td className="py-3 text-right text-gray-500">
                                 KES {parseFloat(rate.maxAmount).toLocaleString()}
                               </td>
                             </tr>
@@ -145,7 +145,7 @@ const RatesPage = () => {
               </CardContent>
             </Card>
 
-            <p className="text-center text-sm text-surface-500">
+            <p className="text-center text-sm text-gray-500">
               Rates last updated: {rates.length > 0 ? formatDate(rates[0].lastUpdated) : 'N/A'}
             </p>
           </div>

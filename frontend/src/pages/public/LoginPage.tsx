@@ -51,12 +51,12 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-900 mesh-bg">
+    <div className="min-h-screen bg-gray-50">
       <PageTitle title="Login" description="Sign in to your Coinsend account to manage your crypto and fiat transactions." />
       <Header />
 
-      <div className="flex items-center justify-center py-12 px-4 min-h-[calc(100vh-64px)]">
-        <Card className="w-full max-w-md animate-fade-in">
+      <div className="flex items-center justify-center py-12 px-4">
+        <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Welcome Back</CardTitle>
             <CardDescription>Sign in to your Coinsend account</CardDescription>
@@ -91,9 +91,9 @@ const LoginPage = () => {
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-surface-400">
+            <div className="mt-6 text-center text-sm text-gray-600">
               Don't have an account?{' '}
-              <Link to="/register" className="text-gold-400 hover:text-gold-300 font-medium transition-colors">
+              <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
                 Sign up
               </Link>
             </div>

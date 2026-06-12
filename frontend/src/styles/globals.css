@@ -3,88 +3,94 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    @apply border-surface-700;
-  }
   body {
-    @apply bg-dark-900 text-surface-100 font-sans antialiased;
-  }
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+    @apply bg-gray-50 text-gray-900 antialiased;
   }
 }
 
 @layer components {
-  /* ── Buttons ── */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
   .btn-primary {
-    @apply bg-gold-400 text-dark-900 hover:bg-gold-300 font-semibold rounded-xl px-6 py-2.5 transition-all active:scale-[0.98] shadow-glow-sm hover:shadow-glow-gold;
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
   }
+
   .btn-secondary {
-    @apply bg-surface-700/40 border border-surface-600/40 text-surface-200 hover:bg-surface-700/60 font-medium rounded-xl px-6 py-2.5 transition-all;
+    @apply btn bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-500;
   }
+
   .btn-outline {
-    @apply border border-gold-400/40 text-gold-400 hover:bg-gold-400/10 font-medium rounded-xl px-6 py-2.5 transition-all;
+    @apply btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-primary-500;
   }
 
-  /* ── Form Controls ── */
-  .input-field {
-    @apply w-full px-4 py-2.5 bg-dark-700/60 border border-surface-600/40 rounded-xl text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-gold-400/50 focus:border-gold-400/60 transition-all;
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
   }
 
-  /* ── Cards ── */
-  .glass-card {
-    @apply bg-dark-800/50 backdrop-blur-xl border border-surface-700/30 rounded-2xl shadow-glass;
-  }
-  .glass-card-hover {
-    @apply glass-card hover:border-gold-400/20 hover:shadow-glow-sm transition-all duration-300;
+  .input {
+    @apply block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500;
   }
 
-  /* ── Gradients ── */
-  .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-gold-300 via-gold-400 to-gold-500;
-  }
-  .gradient-text-purple {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-lavender-400 via-lavender-500 to-lavender-600;
-  }
-  .gradient-hero {
-    background: linear-gradient(135deg, #0D0618 0%, #150B28 30%, #1E1038 60%, #13091F 100%);
+  .input-error {
+    @apply border-red-500 focus:border-red-500 focus:ring-red-500;
   }
 
-  /* ── Backgrounds ── */
-  .mesh-bg {
-    background-image:
-      radial-gradient(ellipse at 15% 20%, rgba(139,92,246,0.06) 0%, transparent 60%),
-      radial-gradient(ellipse at 85% 80%, rgba(245,166,35,0.04) 0%, transparent 60%),
-      radial-gradient(ellipse at 50% 50%, rgba(139,92,246,0.03) 0%, transparent 70%);
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
   }
-  .grid-pattern {
-    background-image: linear-gradient(rgba(139,92,246,0.03) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(139,92,246,0.03) 1px, transparent 1px);
-    background-size: 60px 60px;
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-pending {
+    @apply badge bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-paid {
+    @apply badge bg-blue-100 text-blue-800;
+  }
+
+  .badge-processing {
+    @apply badge bg-purple-100 text-purple-800;
+  }
+
+  .badge-completed {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  .badge-failed {
+    @apply badge bg-red-100 text-red-800;
+  }
+
+  .badge-cancelled {
+    @apply badge bg-gray-100 text-gray-800;
   }
 }
 
-@layer utilities {
-  /* ── Scrollbar ── */
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+/* Animations */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
   }
-  .scrollbar-thin::-webkit-scrollbar-track {
-    @apply bg-dark-800;
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    @apply bg-surface-600 rounded-full;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    @apply bg-surface-500;
-  }
+}
 
-  /* ── Animations ── */
-  .animate-fade-in {
-    animation: fade-in 0.5s ease-out forwards;
-  }
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Safe area for iOS */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }
